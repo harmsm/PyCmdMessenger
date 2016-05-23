@@ -1,9 +1,15 @@
-#CmdMessenger
-Library for communication with an arduino using the CmdMessenger serial
-communication library.  This library requires the baud rate and separators 
-match between the CmdMessenger class instance and the arduino sketch.  The 
-library also assumes the serial data are binary strings, and that each 
-command send by the arduino has a \r\n line-ending.  
+#PyCmdMessenger
+
+Python class for communication with an arduino using the CmdMessenger serial
+communication library. It allows simple sending and recieving of commands,
+getting all commands resident in the serial output buffer at once, and using 
+a listener on its own thread to recieve messages as they come in and append
+them to a recieved messages list. 
+
+This class requires the baud rate and separators match between the
+PyCmdMessenger class instance and the arduino sketch.  The library also
+assumes the serial data are binary strings, and that each command send by the
+arduino has a \r\n line-ending.  
 
 ##Example code
 
@@ -63,12 +69,14 @@ void loop() {
 # above.
 # ------------------------------------------------------------------------------
 
-import CmdMessenger
+import PyCmdMessenger
 
 # Initialize instance of class with appropriate device.  command_names is
 # optional. 
-c = CmdMessenger.CmdMessenger("/dev/ttyACM0",
-                              command_names=("who_are_you","my_name_is","error"))
+c = PyCmdMessenger.PyCmdMessenger("/dev/ttyACM0",
+                                  command_names=("who_are_you",
+                                                 "my_name_is",
+                                                 "error"))
 
 # Send and recieve
 c.send("who_are_you")
@@ -80,10 +88,11 @@ print(msg)
 
 
 ##Python API reference
-Module CmdMessenger
+
+####Module CmdMessenger
 -------------------
 
-Classes
+####Classes
 -------
 CmdMessenger 
     Basic interface for interfacing over a serial connection to an arduino 

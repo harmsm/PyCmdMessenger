@@ -1,74 +1,12 @@
 __description__ = \
 """
-Library for communication with an arduino using the CmdMessenger serial
-communication library.  This library requires the baud rate and separators 
-match between the CmdMessenger class instance and the arduino sketch.  The 
+PyCmdMessenger
+
+Class for communication with an arduino using the CmdMessenger serial
+communication library.  This class requires the baud rate and separators 
+match between the PyCmdMessenger class instance and the arduino sketch.  The 
 library also assumes the serial data are binary strings, and that each 
-command send by the arduino has a \r\n line-ending.  
-"""
-
-"""
---------------------------------------------------------------------------------
-Minimal .ino file for arduino, compiled with CmdMessenger.h and CmdMessenger.cpp
-in the sketch directory. 
---------------------------------------------------------------------------------
-
-#include "CmdMessenger.h"
-
-const int BAUD_RATE = 9600;
-CmdMessenger c = CmdMessenger(Serial,',',';','\\');
-
-/* Define available CmdMessenger commands */
-enum {
-    who_are_you,
-    my_name_is,
-    error,
-};
-
-/* Define callbacks for CmdMessenger commands */
-void attach_callbacks(void) { 
-  
-    // Attach callback methods
-    c.attach(on_unknown_command);
-    c.attach(who_are_you,on_who_are_you);
-}
-
-void on_unknown_command(void){
-    c.sendCmd(error,"Command without callback.");
-}
-
-void on_who_are_you(void){
-    c.sendCmd(my_name_is,"Bob");
-}
-
-void setup() {
-    Serial.begin(BAUD_RATE);
-    c.printLfCr();
-    attach_callbacks();    
-}
-
-void loop() {
-    c.feedinSerialData();
-}
-
---------------------------------------------------------------------------------
-Minimal python program using the library to interface with the arduino sketch
-above.
---------------------------------------------------------------------------------
-
-import CmdMessenger
-
-# Initialize instance of class with appropriate device.  command_names is
-# optional. 
-c = CmdMessenger.CmdMessenger("/dev/ttyACM0",
-                              command_names=("who_are_you","my_name_is","error"))
-
-# Send and recieve
-c.send("who_are_you")
-msg = c.recieve()
-
-# should give [TIME_IN_MS,"my_name_is","Bob"]
-print(msg)
+command sent by the arduino has a \r\n line-ending.  
 """
 __author__ = "Michael J. Harms"
 __date__ = "2016-05-20"
@@ -76,7 +14,7 @@ __date__ = "2016-05-20"
 import serial
 import re, warnings, multiprocessing
 
-class CmdMessenger:
+class PyCmdMessenger:
     """
     Basic interface for interfacing over a serial connection to an arduino 
     using the CmdMessenger library.
@@ -208,7 +146,7 @@ class CmdMessenger:
 
     def recieve_all(self):
         """
-        Get all messages that are coming off arduino (listener and the complete
+        Get all messages from the arduino (both from listener and the complete
         current serial buffer).
         """
 
