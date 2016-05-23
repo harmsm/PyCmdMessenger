@@ -9,7 +9,9 @@ them to a recieved messages list.
 This class requires the baud rate and separators match between the
 PyCmdMessenger class instance and the arduino sketch.  The library also
 assumes the serial data are binary strings, and that each command send by the
-arduino has a \r\n line-ending.  
+arduino has a \r\n line-ending. 
+
+CmdMessenger: https://github.com/thijse/Arduino-CmdMessenger
 
 ##Example code
 
@@ -140,7 +142,7 @@ CmdMessenger
 
         The baud_rate, separators, and escape_character should match what's
         in the arduino code that initializes the CmdMessenger.  The default
-        values match the default values as of CmdMessenger 3.6.
+        values match the default values as of CmdMessenger 4.0.
 
     listen(self, listen_delay=1)
         Listen for incoming messages on its own thread, appending to recieving
