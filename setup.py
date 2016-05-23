@@ -13,5 +13,5 @@ setup(name='PyCmdMessenger',
       url='https://github.com/harmsm/PyCmdMessenger',
       packages=find_packages(),
       zip_safe=False,
-      install_requires=["serial"])
+      install_requires=["pyserial"])
 
