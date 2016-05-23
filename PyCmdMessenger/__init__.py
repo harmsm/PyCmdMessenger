@@ -7,5 +7,4 @@ __author__ = "Michael J. Harms"
 __date__ = "2016-05-23"
 __all__ = ["PyCmdMessenger"]
 
-import PyCmdMessenger
-from PyCmdMessenger import PyCmdMessenger
+from .PyCmdMessenger import PyCmdMessenger as PyCmdMessenger
