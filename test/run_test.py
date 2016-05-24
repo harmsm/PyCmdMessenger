@@ -34,24 +34,24 @@ def try_cmd(c,cmd,expected_result):
         else:
             expected_result = tuple([expected_result])
 
-
     # send the command and receive its output
     c.send(*cmd)
     msg = c.receive()
 
     # make sure results match expectation
     if expected_result != None and msg == None:
-        print("... FAIL.  None returned.")
+        print("... FAIL.  None returned.  Expected: {}".format(expected_result))
+        return
  
     if msg[1] != "result":
-        print("... FAIL.  Command {} returned".format(msg[1]))
+        print("... FAIL.  Command {} returned.  Expected {}".format(msg[1],msg[0]))
  
     result = tuple(msg[2])
  
     if result == expected_result:
         print("... PASS")
     else:
-        print("... FAIL.  Recieved {}".format(result))
+        print("... FAIL.  Recieved {}. Expected {}".format(result,expected_result))
 
 def try_cmd_multi(c,cmd,expected_result,num_reps=10,use_listener=False):
     """
@@ -92,7 +92,7 @@ def try_cmd_multi(c,cmd,expected_result,num_reps=10,use_listener=False):
     # make sure that the output messages have the same length
     if len(msgs) != num_reps:
         print("... FAIL. Only {} of {} messages recieved.".format(len(msgs),num_reps))
-        return None
+        return
 
     # Parse the results, making sure we see what is expected
     results = [] 
@@ -102,12 +102,12 @@ def try_cmd_multi(c,cmd,expected_result,num_reps=10,use_listener=False):
         r2 = tuple(msgs[i][2])
         
         if r1 != "result":
-            print("... FAIL. Command {} returned.".format(r1))
-            return None
+            print("... FAIL. Command {} returned. Expected {}".format(r1,"result"))
+            return
 
         if r2 != expected_result:
-            print("... FAIL. Recieved {}".format(r2))
-            return None
+            print("... FAIL. Recieved {}. Expected {}.".format(r2,expected_result))
+            return
 
     print("... PASS")
 
@@ -169,7 +169,7 @@ def try_cmd_multithread(c,cmd1,cmd2,expected_result1,expected_result2,num_reps=1
     N = int(num_reps/2)*2 + 1
     if len(msgs) != N:
         print("... FAIL. Only {} of {} messages recieved.".format(len(msgs),N))
-        return None
+        return
 
     # see if the results match
     results = [] 
@@ -179,12 +179,12 @@ def try_cmd_multithread(c,cmd1,cmd2,expected_result1,expected_result2,num_reps=1
         r2 = tuple(msgs[i][2])
         
         if r1 != "result":
-            print("... FAIL. Command {} returned.".format(r1))
-            return None
+            print("... FAIL. Command {} returned. Expected {}".format(r1,"result"))
+            return 
 
         if r2 != expected_results[i]:
-            print("... FAIL. Recieved {}".format(r2))
-            return None
+            print("... FAIL. Recieved {}. Expected {}".format(r2,expected_results[i]))
+            return
 
     print("... PASS")
 
@@ -225,7 +225,7 @@ def main(argv=None):
     print("------------------------------------------------------------------")
     
     # Send and receive
-    try_cmd(c,"send_string","A string with escape")
+    try_cmd(c,"send_string","A string with /, and /; escape")
     try_cmd(c,"send_float",99.9)
     try_cmd(c,"send_int",-10)
     try_cmd(c,"send_two_int",[-10,10])
@@ -239,7 +239,7 @@ def main(argv=None):
     print()
     print("RECEIVE ALL")
     print("------------------------------------------------------------------")
-    try_cmd_multi(c,"send_string","A string with escape")
+    try_cmd_multi(c,"send_string","A string with /, and /; escape")
     try_cmd_multi(c,"send_float",99.9)
     try_cmd_multi(c,"send_int",-10)
     try_cmd_multi(c,"send_two_int",[-10,10])
@@ -254,7 +254,7 @@ def main(argv=None):
     print()
     print("USE LISTENER")
     print("------------------------------------------------------------------")
-    try_cmd_multi(c,"send_string","A string with escape",use_listener=True)
+    try_cmd_multi(c,"send_string","A string with /, and /; escape",use_listener=True)
     try_cmd_multi(c,"send_float",99.9,use_listener=True)
     try_cmd_multi(c,"send_int",-10,use_listener=True)
     try_cmd_multi(c,"send_two_int",[-10,10],use_listener=True)
@@ -268,7 +268,7 @@ def main(argv=None):
     print()
     print("USE LISTENER WITH WRITE IN MIDDLE")
     print("------------------------------------------------------------------")
-    try_cmd_multithread(c,"send_string",["receive_float",99.9],"A string with escape",999.0)
+    try_cmd_multithread(c,"send_string",["receive_float",99.9],"A string with /, and /; escape",999.0)
     try_cmd_multithread(c,["receive_string","string"],"send_two_int","got it!",[-10,10])
 
 # If run from the command line...        
