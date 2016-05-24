@@ -64,7 +64,7 @@ class PyCmdMessenger:
 
             The baud_rate, separators, and escape_character should match what's
             in the arduino code that initializes the CmdMessenger.  The default
-            values match the default values as of CmdMessenger 4.0. 
+            separator values match the default values as of CmdMessenger 4.0. 
         """
 
         self.device = device

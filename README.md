@@ -1,19 +1,37 @@
 #PyCmdMessenger
 
 Python class for communication with an arduino using the CmdMessenger serial
-communication library. It allows simple sending and recieving of commands,
-getting all commands resident in the serial output buffer at once, and using 
-a listener on its own thread to recieve messages as they come in and append
-them to a recieved messages list. 
+communication library. It allows simple sending and recieving of messages,
+getting all messages resident in the serial output buffer at once, and using 
+a listener on its own thread to recieve messages as they come in.
 
 This class requires the baud rate and separators match between the
 PyCmdMessenger class instance and the arduino sketch.  The library also
 assumes the serial data are binary strings, and that each command send by the
 arduino has a \r\n line-ending. 
 
-CmdMessenger: https://github.com/thijse/Arduino-CmdMessenger
+### Installation:
+ + From github: 
+    + `git clone XXX` 
+    + `cd PyCmdMessenger`
+    + `sudo python3 setup.py install`
+ + From pipi:
+    + `sudo pip3 install PyCmdMessenger`
+
+For python 2.7, replace `python3` with `python` and `pip3` with `pip`.
+
+### Compatibility
+ + Compatibility: python 3.x, python 2.7
+ + Should work on all platforms supported by pyserial.  
+ + Tested on Raspberry Pi (raspberrian) and linux machine (Ununtu 15.10).  Have 
+not tested on Windows or OSX.
+
+### Dependencies
+ + pyserial (on local machine): https://github.com/pyserial/pyserial
+ + CmdMessenger (on Arduino): https://github.com/thijse/Arduino-CmdMessenger
 
 ##Example code
+--------------
 
 ###Arduino sketch
 
@@ -88,8 +106,23 @@ msg = c.recieve()
 print(msg)
 ```
 
+### Python, using listener:
+This program assumes that the arduino is periodically spitting out messages.
+
+```python
+import time
+import PyCmdMessenger
+
+c = PyCmdMessenger.PyCmdMessenger("/dev/ttyACM0")
+c.listen()
+
+while True:
+    print(c.recieve_from_listener())
+    time.sleep(1)
+```
 
 ##Python API reference
+----------------------
 
 ####Module CmdMessenger
 -------------------
@@ -142,7 +175,7 @@ CmdMessenger
 
         The baud_rate, separators, and escape_character should match what's
         in the arduino code that initializes the CmdMessenger.  The default
-        values match the default values as of CmdMessenger 4.0.
+        separator values match the default values as of CmdMessenger 4.0.
 
     listen(self, listen_delay=1)
         Listen for incoming messages on its own thread, appending to recieving
