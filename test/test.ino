@@ -8,7 +8,7 @@
 #include "CmdMessenger.h"
 
 const int BAUD_RATE = 9600;
-CmdMessenger c = CmdMessenger(Serial,',',';','\\');
+CmdMessenger c = CmdMessenger(Serial,',',';','/');
 
 /* Define available CmdMessenger commands */
 enum {
@@ -29,7 +29,7 @@ void on_unknown_command(void){
 }
 
 void on_send_string(void){
-    c.sendCmd(result,"A string with escape");
+    c.sendCmd(result,"A string with /, and /; escape");
 }
 
 void on_send_float(void){

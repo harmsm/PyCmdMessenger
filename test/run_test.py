@@ -15,6 +15,30 @@ __usage__ = "./run_tests.py DEVICE (where DEVICE is like /dev/ttyACM0)"
 import sys, time
 import PyCmdMessenger
 
+def check_connection(c,cmd,max_num_attempts=50,delay=0.1):
+    """
+    Make sure the connection is made before doing tests.
+    """
+
+    has_connected = False 
+    num_attempts = 0
+    while not has_connected and num_attempts < max_num_attempts:
+
+        c.send(cmd)
+        
+        try:
+            msg = c.receive()
+        except ValueError:
+            msg = True
+
+        if msg != None:
+            return num_attempts * delay
+        else:
+            num_attempts += 1
+            time.sleep(delay)  
+
+    return -1
+
 def try_cmd(c,cmd,expected_result):
     """
     Try a given command, comparing the output to th expected_result
@@ -205,6 +229,12 @@ def main(argv=None):
         err = "Incorrect arguments. Usage: \n\n{}\n\n".format(__usage__)
         raise IndexError(err)
 
+
+
+    # Run a wide variety of tests
+    print("CONNECTING")
+    print("------------------------------------------------------------------")
+
     # Initialize instance of class.
     c = PyCmdMessenger.PyCmdMessenger(serial_device,
                                       command_names=["send_string",
@@ -217,10 +247,17 @@ def main(argv=None):
                                                      "receive_two_int",
                                                      "result",
                                                      "error"])
+    connect_time = check_connection(c,"send_string")
+    if connect_time < 0:
+        print("FAIL.  Could not connect.")
+        err = "connection could not be made"
+        raise SystemError(err)
+
+    else:
+        print("PASS.  Connection made in ~{} s".format(connect_time))
 
 
-    # Run a wide variety of tests
-
+    print()
     print("SEND/RECIEVE")
     print("------------------------------------------------------------------")
     
@@ -247,7 +284,6 @@ def main(argv=None):
     try_cmd_multi(c,["receive_float",99.9],999.0)
     try_cmd_multi(c,["receive_int",-10],-100)
     try_cmd_multi(c,["receive_two_int",-10,10],[-100,100])
-   
  
     #--------------------------------------------------------------------------
 
