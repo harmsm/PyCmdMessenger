@@ -3,7 +3,7 @@ __description__ = \
 """
 run_tests.py
 
-Run a series of test send/recieve commands to an attached arduino.  This assumes
+Run a series of test send/receive commands to an attached arduino.  This assumes
 that the arduino sketch in this directory has been compiled and loaded onto the 
 arduino.  Note the CmdMessenger.* files are taken from that project:
 https://github.com/thijse/Arduino-CmdMessenger 
@@ -12,14 +12,190 @@ __author__ = "Michael J. Harms"
 __date__ = "2016-05-23"
 __usage__ = "./run_tests.py DEVICE (where DEVICE is like /dev/ttyACM0)"
 
-import sys
+import sys, time
 import PyCmdMessenger
+
+def try_cmd(c,cmd,expected_result):
+    """
+    Try a given command, comparing the output to th expected_result
+    """
+
+    # Make the command into a list
+    if type(cmd) != list and type(cmd) != tuple:
+        cmd = [cmd]
+
+    # print the command
+    print("{:20} ".format(cmd[0]),end="")
+
+    # Turn the expected_results into a tuple
+    if type(expected_result) != tuple:
+        if type(expected_result) == list:
+            expected_result = tuple(expected_result)
+        else:
+            expected_result = tuple([expected_result])
+
+
+    # send the command and receive its output
+    c.send(*cmd)
+    msg = c.receive()
+
+    # make sure results match expectation
+    if expected_result != None and msg == None:
+        print("... FAIL.  None returned.")
+ 
+    if msg[1] != "result":
+        print("... FAIL.  Command {} returned".format(msg[1]))
+ 
+    result = tuple(msg[2])
+ 
+    if result == expected_result:
+        print("... PASS")
+    else:
+        print("... FAIL.  Recieved {}".format(result))
+
+def try_cmd_multi(c,cmd,expected_result,num_reps=10,use_listener=False):
+    """
+    Try the command num_reps times in a row, making sure that each has the
+    expected_output. 
+    """
+
+    # Make the command into a list
+    if type(cmd) != list and type(cmd) != tuple:
+        cmd = [cmd]
+
+    # print the command
+    print("{:20} ".format(cmd[0]),end="")
+
+    # Turn the expected_results into a tuple
+    if type(expected_result) != tuple:
+        if type(expected_result) == list:
+            expected_result = tuple(expected_result)
+        else:
+            expected_result = tuple([expected_result])
+
+    # listen, if requested
+    if use_listener:
+        c.listen(0.1)
+
+    # send the same command num_reps times in a row
+    for i in range(num_reps):
+        c.send(*cmd)
+  
+    # get the messages 
+    if use_listener:
+        time.sleep(3)
+        msgs = c.receive_from_listener()
+        c.stop_listening()
+    else:
+        msgs = c.receive_all()
+
+    # make sure that the output messages have the same length
+    if len(msgs) != num_reps:
+        print("... FAIL. Only {} of {} messages recieved.".format(len(msgs),num_reps))
+        return None
+
+    # Parse the results, making sure we see what is expected
+    results = [] 
+    for i in range(len(msgs)):
+
+        r1 = msgs[i][1]
+        r2 = tuple(msgs[i][2])
+        
+        if r1 != "result":
+            print("... FAIL. Command {} returned.".format(r1))
+            return None
+
+        if r2 != expected_result:
+            print("... FAIL. Recieved {}".format(r2))
+            return None
+
+    print("... PASS")
+
+
+def try_cmd_multithread(c,cmd1,cmd2,expected_result1,expected_result2,num_reps=10):
+    """
+    Try cmd1 and cmd2 with multithreading.  Execute cmd1 with a listner, then
+    cmd2 and then cmd1.  Make sure the listner gets the coorect output values.
+    """
+
+    # turn commands into lists
+    if type(cmd1) != list and type(cmd1) != tuple:
+        cmd1 = [cmd1]
+
+    if type(cmd2) != list and type(cmd2) != tuple:
+        cmd2 = [cmd2]
+
+    # print the command
+    print("{:20} ".format("multithread"),end="")
+
+    # turn expected_results into tuples
+    if type(expected_result1) != tuple:
+        if type(expected_result1) == list:
+            expected_result1 = tuple(expected_result1)
+        else:
+            expected_result1 = tuple([expected_result1])
+
+    if type(expected_result2) != tuple:
+        if type(expected_result2) == list:
+            expected_result2 = tuple(expected_result2)
+        else:
+            expected_result2 = tuple([expected_result2])
+
+    # flip on listener
+    c.listen(0.1)
+
+    # Run the command, collecting expected results for command 1...
+    expected_results = []
+    for i in range(int(num_reps/2)):
+        c.send(*cmd1)
+        expected_results.append(expected_result1)
+
+    # ... command 2 ...
+    c.send(*cmd2)
+    expected_results.append(expected_result2)
+
+    # ... and then command 1.
+    for i in range(int(num_reps/2)):
+        c.send(*cmd1)
+        expected_results.append(expected_result1)
+   
+    time.sleep(num_reps*2*0.1)
+
+    # Receive the messages
+    msgs = c.receive_from_listener()
+    c.stop_listening()
+
+    # make sure there are enought messages 
+    N = int(num_reps/2)*2 + 1
+    if len(msgs) != N:
+        print("... FAIL. Only {} of {} messages recieved.".format(len(msgs),N))
+        return None
+
+    # see if the results match
+    results = [] 
+    for i in range(N):
+
+        r1 = msgs[i][1]
+        r2 = tuple(msgs[i][2])
+        
+        if r1 != "result":
+            print("... FAIL. Command {} returned.".format(r1))
+            return None
+
+        if r2 != expected_results[i]:
+            print("... FAIL. Recieved {}".format(r2))
+            return None
+
+    print("... PASS")
+
+
 
 def main(argv=None):
     """
     Parse command line and run tests.
     """
 
+    # Parse command line
     if argv == None:
         argv = sys.argv[1:]
 
@@ -30,96 +206,72 @@ def main(argv=None):
         raise IndexError(err)
 
     # Initialize instance of class.
-    c = PyCmdMessenger.PyCmdMessenger(serial_device)
+    c = PyCmdMessenger.PyCmdMessenger(serial_device,
+                                      command_names=["send_string",
+                                                     "send_float",
+                                                     "send_int",
+                                                     "send_two_int",
+                                                     "receive_string",
+                                                     "receive_float",
+                                                     "receive_int",
+                                                     "receive_two_int",
+                                                     "result",
+                                                     "error"])
 
-    #--------------------------------------------------------------------------
 
-    print("Testing simple send/recieve... ",end="")
+    # Run a wide variety of tests
+
+    print("SEND/RECIEVE")
+    print("------------------------------------------------------------------")
     
-    # Send and recieve
-    c.send("who_are_you")
-    msg = c.recieve()
-
-    if msg[1] == "my_name_is" and msg[2] == "Bob":
-        print("PASS")
-    else:
-        print("FAIL -> output is: {}".format(msg))
-
+    # Send and receive
+    try_cmd(c,"send_string","A string with escape")
+    try_cmd(c,"send_float",99.9)
+    try_cmd(c,"send_int",-10)
+    try_cmd(c,"send_two_int",[-10,10])
+    try_cmd(c,["receive_string","string"],"got it!")
+    try_cmd(c,["receive_float",99.9],999.0)
+    try_cmd(c,["receive_int",-10],-100)
+    try_cmd(c,["receive_two_int",-10,10],[-100,100])
+    
     #--------------------------------------------------------------------------
 
-    print("Testing multiread... ",endl="")
+    print()
+    print("RECEIVE ALL")
+    print("------------------------------------------------------------------")
+    try_cmd_multi(c,"send_string","A string with escape")
+    try_cmd_multi(c,"send_float",99.9)
+    try_cmd_multi(c,"send_int",-10)
+    try_cmd_multi(c,"send_two_int",[-10,10])
+    try_cmd_multi(c,["receive_string","string"],"got it!")
+    try_cmd_multi(c,["receive_float",99.9],999.0)
+    try_cmd_multi(c,["receive_int",-10],-100)
+    try_cmd_multi(c,["receive_two_int",-10,10],[-100,100])
+   
+ 
+    #--------------------------------------------------------------------------
 
-    for i in range(10):
-        c.send("who_are_you")
-
-    time.sleep(1)
-
-    msgs = c.recieve_all()
-    results = [] 
-    for i in range(len(msgs)):
-        results.append(msgs[i][1] == "my_name_is" and msgs[i][2] == "Bob")
-
-    if sum(results) == 10:
-        print("PASS")
-    else:
-        print("FAIL")
+    print()
+    print("USE LISTENER")
+    print("------------------------------------------------------------------")
+    try_cmd_multi(c,"send_string","A string with escape",use_listener=True)
+    try_cmd_multi(c,"send_float",99.9,use_listener=True)
+    try_cmd_multi(c,"send_int",-10,use_listener=True)
+    try_cmd_multi(c,"send_two_int",[-10,10],use_listener=True)
+    try_cmd_multi(c,["receive_string","string"],"got it!",use_listener=True)
+    try_cmd_multi(c,["receive_float",99.9],999.0,use_listener=True)
+    try_cmd_multi(c,["receive_int",-10],-100,use_listener=True)
+    try_cmd_multi(c,["receive_two_int",-10,10],[-100,100],use_listener=True)
         
     #--------------------------------------------------------------------------
 
-    print("Testing listener...",endl="")
-    c.listen(0.1)
-    for i in range(10):
-        c.send("who_are_you")
+    print()
+    print("USE LISTENER WITH WRITE IN MIDDLE")
+    print("------------------------------------------------------------------")
+    try_cmd_multithread(c,"send_string",["receive_float",99.9],"A string with escape",999.0)
+    try_cmd_multithread(c,["receive_string","string"],"send_two_int","got it!",[-10,10])
 
-    time.sleep(2)
-
-    msgs = c.recieve_from_listener()
-    results = []
-    for i in range(len(msgs)):
-        results.append(msgs[i][1] == "my_name_is" and msgs[i][2] == "Bob")
-
-    c.stop_listening()
-
-    if sum(results) == 10:
-        print("PASS")
-    else:
-        print("FAIL")
-
-    #--------------------------------------------------------------------------
-
-    print("Testing listener and threading...",endl="")
-    c.listen(0.5)
-    for i in range(5):
-        c.send("who_are_you")
-
-    c.send("bad_command")
-
-    for i in range(5):
-        c.send("who_are_you")
-
-    time.sleep(7)
-
-    msgs = c.recieve_from_listener()
-
-    try:
-        results = []
-        for i in range(5):
-            results.append(msgs[i][1] == "my_name_is" and msgs[i][2] == "Bob")
-        
-        results.append(msgs[5][1] == "error"
-                       and msgs[i][2] == "Command without callback.")
-
-        for i in range(6,11):
-            results.append(msgs[i][1] == "my_name_is" and msgs[i][2] == "Bob")
-    except:
-        results = []
-
-    if sum(results) == 11:
-        print("PASS")
-    else:
-        print("FAIL")
-
-        
+# If run from the command line...        
 if __name__ == "__main__":
     main()    
 

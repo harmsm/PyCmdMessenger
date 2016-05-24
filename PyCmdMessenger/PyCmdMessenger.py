@@ -12,7 +12,7 @@ __author__ = "Michael J. Harms"
 __date__ = "2016-05-20"
 
 import serial
-import re, warnings, multiprocessing
+import re, warnings, multiprocessing, time
 
 class PyCmdMessenger:
     """
@@ -22,8 +22,8 @@ class PyCmdMessenger:
     
     def __init__(self,
                  device,
+                 command_names,
                  timeout=0.25,
-                 command_names=None,
                  baud_rate=9600,
                  field_separator=",",
                  command_separator=";",
@@ -34,16 +34,14 @@ class PyCmdMessenger:
             device:
                 device location (e.g. /dev/ttyACM0)
 
+            command_names:
+                a list or tuple of the command names specified in the arduino
+                .ino file *in the same order they are listed there.*  
+
             timeout:
                 time to wait on a given serial request before giving up
                 (seconds).  Default: 0.25
 
-            command_names:
-                a list or tuple of the command names specified in the arduino
-                .ino file in the same order they are listed.  It is optional.
-                If not specified, the library will give each command its 
-                arduino-specified number rather than name. Default: ()
-            
             baud_rate: 
                 serial baud rate. Default: 9600
 
@@ -69,13 +67,12 @@ class PyCmdMessenger:
         """
 
         self.device = device
+
+        self.command_names = command_names[:]
+        self._cmd_name_to_int = dict([(n,i)
+                                      for i,n in enumerate(self.command_names)])
+
         self.timeout = timeout
-
-        if command_names == None:
-            self.command_names = ()
-        else:
-            self.command_names = command_names
-
         self.baud_rate = baud_rate
         self.field_separator = field_separator
         self.command_separator = command_separator
@@ -90,7 +87,8 @@ class PyCmdMessenger:
                                             timeout=self.timeout)
 
         self._listener_thread = None
-        self._recieved_messages = None
+        self._listener_manager = multiprocessing.Manager()
+        self._received_messages = self._listener_manager.list()
         self._lock = multiprocessing.Lock()
        
     def send(self,*args):
@@ -106,18 +104,27 @@ class PyCmdMessenger:
             raise ValueError(err)
 
         # Turn arguments into strings, replacing separators with escaped separators
-        strings = [self._esc_pattern.sub(self._esc_sub_str,"{}".format(a))
-                   for a in args]
+        try:
+            command_as_int = self._cmd_name_to_int[args[0]]
+        except KeyError:
+            err = "Command '{}' not recognized.\n".format(args[0])
+            raise ValueError(err)
+
+        params = [self._esc_pattern.sub(self._esc_sub_str,"{}".format(a))
+                  for a in args[1:]]
+
+        strings = ["{}".format(command_as_int)]
+        strings.extend(params)
 
         # compile the final string
         compiled_string = "{};".format(",".join(strings))
 
-        # Send the message (waiting for lock in case a listener or recieve
+        # Send the message (waiting for lock in case a listener or receive
         # command is going). 
         with self._lock:
             self._serial_handle.write(compiled_string.encode('ascii'))
 
-    def recieve(self):
+    def receive(self):
         """
         Read a single serial message sent by CmdMessage library.  
         """
@@ -128,7 +135,7 @@ class PyCmdMessenger:
 
         return self._parse_message(message)
 
-    def recieve_from_listener(self,warn=True):
+    def receive_from_listener(self,warn=True):
         """
         Return messages that have been grabbed by the listener.
         
@@ -139,20 +146,20 @@ class PyCmdMessenger:
         if self._listener_thread == None and warn == True:
             warnings.warn("Not currently listening.")
 
-        with self._lock:        
-            out = self._recieved_messages[:]
-            self._recieved_messages = []
+        with self._lock:
+            out = self._received_messages[:]
+            self._received_messages = self._listener_manager.list()
 
         return out
 
-    def recieve_all(self):
+    def receive_all(self):
         """
         Get all messages from the arduino (both from listener and the complete
         current serial buffer).
         """
 
-        # Grab messages already in the recieved_queue
-        msg_list = self.recieve_from_listener(warn=False)[:]
+        # Grab messages already in the received_queue
+        msg_list = self.receive_from_listener(warn=False)[:]
 
         # Now read all lines in the buffer
         with self._lock:
@@ -165,6 +172,7 @@ class PyCmdMessenger:
                     msg_list.append(message)
                 else:
                     break
+        
 
         return msg_list
 
@@ -184,7 +192,6 @@ class PyCmdMessenger:
         else:
             self._listener_thread = multiprocessing.Process(target=self._listen)
             self._listener_thread.start()
-            self._listener_thread.join()    
 
     def stop_listening(self):
         """
@@ -194,7 +201,7 @@ class PyCmdMessenger:
         if self._listener_thread == None:
             warnings.warn("Not currently listening.\n")
         else:
-            self._listener_thread.close() 
+            self._listener_thread.terminate() 
             self._listener_thread = None
 
     def _parse_message(self,message):
@@ -227,10 +234,12 @@ class PyCmdMessenger:
         # Grab non-empty messages
         message_list = [m for m in message_list if m.strip() != ""]
 
-        # Make sure that only a single message was recieved.
+        # Make sure that only a single message was received.
         if len(message_list) > 1:
-            err = "Mangled message recieved.  Has multiple commands on one line.\n"
+            err = "Mangled message received.  Has multiple commands on one line.\n"
             raise ValueError(err)
+
+        m = message_list[0]
 
         # Split message on field separator, ignoring escaped separtaors
         fields = re.split(r'(?<!\\){}'.format(self.field_separator),m)
@@ -240,39 +249,42 @@ class PyCmdMessenger:
         # Try to convert the command integer into a named command string
         try:
             command = self.command_names[int(command)]
-        except ValueError:
+        except (ValueError,IndexError):
             pass
 
         # Parse all of the fields
         field_out = []
         for f in fields[1:]:
 
-            if f.isdigit():
-                # is it an integer?
-                field_out.append(int(f))
-            else: 
+            try:
+                float(f)
 
-                try:
-                    # is it a float?
+                if len(f.split(".")) == 1:
+                    # integer
+                    field_out.append(int(f))
+                else:
+                    # float
                     field_out.append(float(f))
-                except ValueError:
-                    # keep as a string
-                    field_out.append(f)
+
+            except ValueError:
+                # keep as a string
+                field_out.append(f)
 
         return message_time, command, field_out
       
     def _listen(self):
         """
         Private function that should be run within a Process instance.  This 
-        looks for an incoming message and then appends that (timestampted) 
+        looks for an incoming message and then appends that (timestamped) 
         to the message queue. 
         """
 
-        tmp = self._recieve()
-        if tmp != None:
-            with self._lock:         
-                self._recieved_messages.append(tmp)
+        while True:
 
-        time.sleep(self._listen_delay)
+            tmp = self.receive()
+            if tmp != None:
+                with self._lock:
+                    self._received_messages.append(tmp)
+
+            time.sleep(self._listen_delay)
         
-
