@@ -20,6 +20,10 @@ arduino has a \r\n line-ending.
 
 For python 2.7, replace `python3` with `python` and `pip3` with `pip`.
 
+To test library, compile the arduino sketch in the `test` directory, transfer 
+this to an arduino, plug the arduino in to the computer, and then run the
+`test/run_test.py` script.
+
 ### Compatibility
  + Compatibility: python 3.x, python 2.7
  + Should work on all platforms supported by pyserial.  

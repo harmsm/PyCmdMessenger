@@ -57,6 +57,7 @@ class PyCmdMessenger:
        
             escape_character:
                 escape charcater to allow separators within messages.
+                Default: "\\"
  
             convert_strings:
                 on receiving, try to intelligently convert parameters to
@@ -177,7 +178,7 @@ class PyCmdMessenger:
         """
 
         self._listen_delay = listen_delay
-
+       
         if self._listener_thread != None:
             warnings.warn("Already listening.\n")
         else:

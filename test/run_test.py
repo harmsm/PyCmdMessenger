@@ -5,7 +5,8 @@ run_tests.py
 
 Run a series of test send/recieve commands to an attached arduino.  This assumes
 that the arduino sketch in this directory has been compiled and loaded onto the 
-arduino.
+arduino.  Note the CmdMessenger.* files are taken from that project:
+https://github.com/thijse/Arduino-CmdMessenger 
 """
 __author__ = "Michael J. Harms"
 __date__ = "2016-05-23"
