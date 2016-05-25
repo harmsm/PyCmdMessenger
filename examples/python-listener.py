@@ -1,4 +1,9 @@
 
+# ------------------------------------------------------------------------------
+# Python program using the library to interface with the arduino sketch above,
+# demonstrating the use of the listener.
+# ------------------------------------------------------------------------------
+
 import time
 import PyCmdMessenger
 

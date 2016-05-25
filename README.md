@@ -67,9 +67,11 @@ To ensure stable communication with PyCmdMessenger:
    + escape separator, so field and command separators can be sent within
      strings (default "/")
  * Baud rate must match between PyCmdMessenger class and arduino sketch. 
- * Arduino must send commands with the "\r\n" line ending [NOT SURE THIS IS TRUE]
+ * Arduino must send commands with the "\r\n" line ending. This is achieved by
+   calling the CmdMessenger::printLfCr method in the arduino setup function.
 
-The programs shown below are in the [examples](https://github.com/harmsm/PyCmdMessenger/tree/master/examples) directory.
+A basic example is shown below.  These files are in the 
+[examples](https://github.com/harmsm/PyCmdMessenger/tree/master/examples) directory.
  
 ###Arduino sketch
 
@@ -179,6 +181,11 @@ print(msg)
 ### Python, using listener:
 
 ```python
+# ------------------------------------------------------------------------------
+# Python program using the library to interface with the arduino sketch above,
+# demonstrating the use of the listener.
+# ------------------------------------------------------------------------------
+
 import time
 import PyCmdMessenger
 
