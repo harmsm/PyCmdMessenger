@@ -27,7 +27,7 @@ class PyCmdMessenger:
                  baud_rate=9600,
                  field_separator=",",
                  command_separator=";",
-                 escape_character="\\",
+                 escape_separator="/",
                  convert_strings=True):
         """
         Input:
@@ -53,15 +53,15 @@ class PyCmdMessenger:
                 character that separates messages (commands) from each other
                 Default: ";" 
        
-            escape_character:
-                escape charcater to allow separators within messages.
-                Default: "\\"
+            escape_separator:
+                escape character to allow separators within messages.
+                Default: "/"
  
             convert_strings:
                 on receiving, try to intelligently convert parameters to
                 integers or floats. Default: True
 
-            The baud_rate, separators, and escape_character should match what's
+            The baud_rate, separators, and escape_separator should match what's
             in the arduino code that initializes the CmdMessenger.  The default
             separator values match the default values as of CmdMessenger 4.0. 
         """
@@ -76,11 +76,11 @@ class PyCmdMessenger:
         self.baud_rate = baud_rate
         self.field_separator = field_separator
         self.command_separator = command_separator
-        self.escape_character = escape_character
+        self.escape_separator = escape_separator
 
         self._esc_pattern = re.compile(r"([{}{}])".format(self.field_separator,
                                                           self.command_separator))
-        self._esc_sub_str = r"{}\\1".format(self.escape_character)
+        self._esc_sub_str = r"{}\\1".format(self.escape_separator)
 
         self._serial_handle = serial.Serial(self.device,
                                             self.baud_rate,
@@ -96,7 +96,8 @@ class PyCmdMessenger:
         Send a command (which may or may not have associated arguments) to an 
         arduino using the CmdMessage protocol.  The command and any parameters
         should be passed as direct arguments to send.  The function will convert
-        python data types to strings, as well as escaping problem characters.
+        python data types to strings, as well as escaping all separator
+        characters.
         """
 
         if len(args) < 1:
@@ -176,7 +177,7 @@ class PyCmdMessenger:
 
         return msg_list
 
-    def listen(self,listen_delay=1):
+    def listen(self,listen_delay=0.25):
         """
         Listen for incoming messages on its own thread, appending to recieving
         queue.  
@@ -229,7 +230,9 @@ class PyCmdMessenger:
             return None
 
         # Split message by command separator, ignoring escaped command separators
-        message_list = re.split(r'(?<!\\){}'.format(self.command_separator),message)
+        message_list = re.split(r'(?<!\{}){}'.format(self.escape_separator,
+                                                     self.command_separator),
+                                                     message)
         
         # Grab non-empty messages
         message_list = [m for m in message_list if m.strip() != ""]
@@ -242,8 +245,8 @@ class PyCmdMessenger:
         m = message_list[0]
 
         # Split message on field separator, ignoring escaped separtaors
-        fields = re.split(r'(?<!\\){}'.format(self.field_separator),m)
-        fields = m.split(self.field_separator)
+        fields = re.split(r'(?<!\{}){}'.format(self.escape_separator,
+                                               self.field_separator),m)
         command = fields[0]
 
         # Try to convert the command integer into a named command string
