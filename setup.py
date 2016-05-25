@@ -16,5 +16,5 @@ setup(name='PyCmdMessenger',
       download_url='https://XX',
       zip_safe=False,
       install_requires=["pyserial"],
-      classifiers=['arduino','raspberry pi','serial','usb'])
+      classifiers=['Programming Language :: Python'])
 

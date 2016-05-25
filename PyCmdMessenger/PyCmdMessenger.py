@@ -23,7 +23,7 @@ class PyCmdMessenger:
     def __init__(self,
                  device,
                  command_names,
-                 timeout=0.25,
+                 timeout=2.0,
                  baud_rate=9600,
                  field_separator=",",
                  command_separator=";",
@@ -40,7 +40,7 @@ class PyCmdMessenger:
 
             timeout:
                 time to wait on a given serial request before giving up
-                (seconds).  Default: 0.25
+                (seconds).  Default: 2.0
 
             baud_rate: 
                 serial baud rate. Default: 9600
@@ -89,7 +89,7 @@ class PyCmdMessenger:
         self._listener_thread = None
         self._listener_manager = multiprocessing.Manager()
         self._received_messages = self._listener_manager.list()
-        self._lock = multiprocessing.Lock()
+        self._lock = multiprocessing.RLock()
        
     def send(self,*args):
         """
