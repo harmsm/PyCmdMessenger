@@ -35,6 +35,15 @@ not tested on Windows or OSX.
  * pyserial (on local machine): https://github.com/pyserial/pyserial
  * CmdMessenger (on Arduino): https://github.com/thijse/Arduino-CmdMessenger
 
+pyserial should be installed automatically by pip or the installaion script. 
+For CmdMessenger, please follow the directions on their
+[site](https://github.com/thijse/Arduino-CmdMessenger).  Copies of the 
+CmdMessenter 4.0 main .cpp and .h files are included in the PyCmdMessenger repo
+in the [test/arduino](https://github.com/harmsm/PyCmdMessenger/tree/master/test/arduino) and
+[examples/arduino](https://github.com/harmsm/PyCmdMessenger/tree/master/examples/arduino)
+directories. 
+
+
 ##Example code
 --------------
 
