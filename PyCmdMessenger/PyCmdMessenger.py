@@ -141,6 +141,8 @@ class CmdMessenger:
                 # if not, guess for all arguments
                 arg_format_list = ["g" for i in range(len(args))]
 
+        print(args)
+
         if len(arg_format_list) != len(args):
             err = "Number of argument formats must match the number of arguments."
             raise ValueError(err)
@@ -243,6 +245,7 @@ class CmdMessenger:
                 # if not, guess for all arguments
                 arg_format_list = ["g" for i in range(len(fields[1:]))]
 
+        print(fields)
         if len(arg_format_list) != len(fields[1:]):
             err = "Number of argument formats must match the number of arguments."
             raise ValueError(err)
@@ -287,11 +290,11 @@ class CmdMessenger:
             value = new_value
 
         # Range check
-        if value > self.board.max_int or value < self.board.min_int:
+        if value > self.board.int_max or value < self.board.int_min:
             err = "Value {} exceeds the size of the board's int.".format(value)
             raise ValueError(err)
            
-        return struct.pack("i",v)
+        return struct.pack("i",value)
  
     def _send_unsigned_int(self,value):
         """
