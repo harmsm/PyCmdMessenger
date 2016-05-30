@@ -15,8 +15,9 @@ __date__ = "2016-05-20"
 
 import serial
 import re, warnings, multiprocessing, time, struct
+from . import exceptions
 
-class PyCmdMessenger:
+class CmdMessenger:
     """
     Basic interface for interfacing over a serial connection to an arduino 
     using the CmdMessenger library.
@@ -28,7 +29,7 @@ class PyCmdMessenger:
                  command_formats=None,
                  field_separator=",",
                  command_separator=";",
-                 escape_separator="/")
+                 escape_separator="/"):
         """
         Input:
             board_instance:
@@ -72,9 +73,9 @@ class PyCmdMessenger:
         self.command_separator = command_separator
         self.escape_separator = escape_separator
    
-        self.byte_field_sep = self.field_separator.encode("ascii")
-        self.byte_command_sep = self.command_separator.encode("ascii")
-        self.byte_escape_sep = self.escape_separator.encode("ascii")
+        self._byte_field_sep = self.field_separator.encode("ascii")
+        self._byte_command_sep = self.command_separator.encode("ascii")
+        self._byte_escape_sep = self.escape_separator.encode("ascii")
 
         self._send_methods = {"c":self._send_char,
                               "i":self._send_int,
@@ -117,10 +118,6 @@ class PyCmdMessenger:
         specified on a per-command basis when the class was initialized.  
         """
 
-        if len(args) < 1:
-            err = "You must specify a command (and maybe parameters).\n"
-            raise ValueError(err)
-
         # Turn the command into an integer.
         try:
             command_as_int = self._cmd_name_to_int[cmd]
@@ -139,24 +136,23 @@ class PyCmdMessenger:
             try:
                 # See if class was initialized with a format for arguments to this
                 # command
-                arg_formats = self._cmd_name_to_format[args[0]]
+                arg_formats = self._cmd_name_to_format[cmd]
             except KeyError:
                 # if not, guess for all arguments
-                arg_format_list = ["g" for i in range(len(args[1:]))]
+                arg_format_list = ["g" for i in range(len(args))]
 
-        if len(arg_format_list) != len(args[1:]):
+        if len(arg_format_list) != len(args):
             err = "Number of argument formats must match the number of arguments."
             raise ValueError(err)
 
         # Go through each argument and create a bytes representation in the
         # proper format to send.
-        fields = [struct.pack('i',command_as_int)[0]]
-        for i, a in enumerate(args[1:]):
+        fields = ["{}".format(command_as_int).encode("ascii")]
+        for i, a in enumerate(args):
             fields.append(self._send_methods[arg_format_list[i]](a))
 
         # Make something that looks like cmd,field1,field2,field3;
-        compiled_bytes = b"{}{}".format(self._bytes_field_separator.join(fields),
-                                        self._bytes_cmd_separator)
+        compiled_bytes = self._byte_field_sep.join(fields) + self._byte_command_sep
 
         # Send the message (waiting for lock in case a listener or receive
         # command is going). 
@@ -173,22 +169,24 @@ class PyCmdMessenger:
         basis when the class was initialized.  
         """
 
-        # Read serial input until nothing or a command ending character is 
-        # reached
-        msg = []
-        tmp = b'XXX'
-        while tmp != self._byte_cmd_separator and tmp != b'':
+        with self._lock:
 
-            tmp = self.board.read()
+            # Read serial input until nothing or a command ending character is 
+            # reached
+            msg = []
+            tmp = b'XXX'
+            while tmp != self._byte_command_sep and tmp != b'':
 
-            # Deal with escaped cmd separators (e.g. test/;this -> test;this)
-            if tmp == self._byte_cmd_separator and msg[-1] == self._byte_escape_character:
-                msg[-1] == tmp
-                tmp = b'XXX' 
-            else: 
-                msg.append(tmp)
+                tmp = self.board.read()
+
+                # Deal with escaped cmd separators (e.g. test/;this -> test;this)
+                if tmp == self._byte_command_sep and msg[-1] == self._byte_escape_sep:
+                    msg[-1] == tmp
+                    tmp = b'XXX' 
+                else: 
+                    msg.append(tmp)
         
-  
+ 
         # No message received given timeouts
         if len(msg) == 0:
             return None
@@ -200,17 +198,22 @@ class PyCmdMessenger:
         joined_msg = b''.join(msg).strip()
 
         # Make sure the message terminated properly
-        if msg[-1] != self.byte_cmd_separator:
+        if msg[-1] != self._byte_command_sep:
+           
+            # empty message (likely from line endings being included) 
+            if joined_msg.strip() == b'':
+                return  None
+            
             err = "Incomplete message ({})".format(joined_msg.decode())
-            raise PCMMangledMessageError(err)
+            raise exceptions.PCMMangledMessageError(err)
 
         # Split on field separator (e.g. ',')
-        tmp_fields = joined_msg[:-1].split(self.byte_field_separator)
+        tmp_fields = joined_msg[:-1].split(self._byte_field_sep)
 
         # Combine fields based on escaped separators (e.g. x/,x -> x,x)
         fields = [tmp_fields[0]]
         for i in range(1,len(tmp_fields)):
-            if fields[i-1][-1] == self.byte_escape_character:
+            if fields[i-1][-1] == self._byte_escape_sep:
                 fields[i-1] = b''.join(fields[i-1][:-1],tmp_fields[i])
             else:
                 fields.append(tmp_fields[i])
@@ -218,8 +221,9 @@ class PyCmdMessenger:
         # Get the command name.
         cmd = fields[0].strip().decode()
         try:
-            cmd_name = self.command_names[cmd]
-        except KeyError:
+            cmd_name = self.command_names[int(cmd)]
+        except (ValueError,IndexError):
+            cmd_name = "unknown"
             w = "Recieved unrecognized command ({}).".format(cmd)
             Warning(w)
         
@@ -234,10 +238,10 @@ class PyCmdMessenger:
             try:
                 # See if class was initialized with a format for arguments to this
                 # command
-                arg_formats = self._cmd_name_to_format[args[0]]
+                arg_formats = self._cmd_name_to_format[cmd_name]
             except KeyError:
                 # if not, guess for all arguments
-                arg_format_list = ["g" for i in range(len(args[1:]))]
+                arg_format_list = ["g" for i in range(len(fields[1:]))]
 
         if len(arg_format_list) != len(fields[1:]):
             err = "Number of argument formats must match the number of arguments."
@@ -247,7 +251,7 @@ class PyCmdMessenger:
         for i, f in enumerate(fields[1:]):
             received.append(self._recv_methods[arg_format_list[i]](f))
         
-        return command_name, received, message_time
+        return cmd_name, received, message_time
 
     def _send_char(self,value):
         """
@@ -372,7 +376,7 @@ class PyCmdMessenger:
             return struct.pack("d",value)
         else:
             err = "float bytes should be 4 (32 bit) or 8 (64 bit)"
-            raise PCMBadSpecError(err)
+            raise exceptions.PCMBadSpecError(err)
  
     def _send_double(self,value):
         """
@@ -395,7 +399,7 @@ class PyCmdMessenger:
             return struct.pack("d",value)
         else:
             err = "double bytes should be 4 (32 bit) or 8 (64 bit)"
-            raise PCMBadSpecError(err)
+            raise exceptions.PCMBadSpecError(err)
         
 
     def _send_string(self,value):
@@ -435,9 +439,9 @@ class PyCmdMessenger:
             w = "Warning: Sending {} as a string. This can give wildly incorrect values. Consider specifying a format and sending binary data.".format(value)
             Warning(w)
 
-        if type(a) == float:
+        if type(value) == float:
             return "{:.10e}".format(value).encode("ascii")
-        elif type(a) == bool:
+        elif type(value) == bool:
             return "{}".format(int(value)).encode("ascii")
         else:
             if type(value) == bytes:
@@ -486,7 +490,7 @@ class PyCmdMessenger:
         Recieve a float in binary format, returning as python float.
         """
 
-        if self.board.float_bytes === 4:
+        if self.board.float_bytes == 4:
             return struct.unpack("f",value)[0]
         elif self.board.float_bytes == 8:
             return struct.unpack("d",value)[0]
@@ -499,7 +503,7 @@ class PyCmdMessenger:
         Recieve a double in binary format, returning as python float.
         """
 
-        if self.board.double_bytes === 4:
+        if self.board.double_bytes == 4:
             return struct.unpack("f",value)[0]
         elif self.board.double_bytes == 8:
             return struct.unpack("d",value)[0]
@@ -542,15 +546,17 @@ class PyCmdMessenger:
         w = "Warning: Guessing input format for {}. This can give wildly incorrect values. Consider specifying a format and sending binary data.".format(value)
         Warning(w)
 
-        try:
-            float(value)
+        tmp_value = value.decode()
 
-            if len(value.split(".")) == 1:
+        try:
+            float(tmp_value)
+
+            if len(tmp_value.split(".")) == 1:
                 # integer
-                return int(value)
+                return int(tmp_value)
             else:
                 # float
-                return float(value)
+                return float(tmp_value)
 
         except ValueError:
             pass
@@ -604,7 +610,7 @@ class PyCmdMessenger:
         with self._lock:
         
             while True:
-                message = self._serial_handle.readline().decode().strip("\r\n")
+                message = self.board.readline().decode().strip("\r\n")
                 message = self._parse_message(message)
 
                 if message != None:
@@ -643,12 +649,6 @@ class PyCmdMessenger:
             self._listener_thread.terminate() 
             self._listener_thread = None
 
-    def close(self):
-        """
-        Close the serial connection.
-        """
-
-        self._serial_handle.close()
 
     def _listen(self):
         """

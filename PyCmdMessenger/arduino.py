@@ -52,7 +52,7 @@ class ArduinoBoard:
         self.long_bytes = long_bytes
         self.float_bytes = float_bytes
         self.double_bytes = double_bytes
-        self.max_baud = max_baud
+        self.baud_rate = baud_rate
 
         # Open up the serial port
         self.comm = serial.Serial(self.device,
@@ -92,4 +92,31 @@ class ArduinoBoard:
         else:
             err = "double bytes should be 4 (32 bit) or 8 (64 bit)"
             raise PCMBadSpecError(err)
+
+    def read(self):
+        """
+        Wrap serial read method.
+        """
+
+        return self.comm.read()
+
+    def readline(self):
+        """
+        Wrap serial readline method.
+        """
         
+        return self.comm.readline()
+
+    def write(self,msg):
+        """
+        Wrap serial write method.
+        """
+        
+        self.comm.write(msg)
+
+    def close(self):
+        """
+        Close serial connection.
+        """
+
+        self.comm.close() 
