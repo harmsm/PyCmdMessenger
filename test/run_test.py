@@ -39,7 +39,7 @@ def check_connection(c,cmd,max_num_attempts=50,delay=0.1):
 
     return -1
 
-def try_cmd(c,cmd,expected_result):
+def try_cmd(c,cmd,expected_result,label=None):
     """
     Try a given command, comparing the output to th expected_result
     """
@@ -49,7 +49,10 @@ def try_cmd(c,cmd,expected_result):
         cmd = [cmd]
 
     # print the command
-    print("{:20} ".format(cmd[0]),end="")
+    if label == None:
+        print("{:20} ".format(cmd[0]),end="")
+    else:
+        print("{:20} ".format(label),end="")
 
     # Turn the expected_results into a tuple
     if type(expected_result) != tuple:
@@ -246,7 +249,8 @@ def main(argv=None):
                                                      "receive_int",
                                                      "receive_two_int",
                                                      "result",
-                                                     "error"])
+                                                     "error"],
+                                      convert_strings=False)
     connect_time = check_connection(c,"send_string")
     if connect_time < 0:
         print("FAIL.  Could not connect.")
@@ -270,7 +274,13 @@ def main(argv=None):
     try_cmd(c,["receive_float",99.9],999.0)
     try_cmd(c,["receive_int",-10],-100)
     try_cmd(c,["receive_two_int",-10,10],[-100,100])
-    
+
+    for i in range(-10,10):
+        label = "10e{}".format(i)
+        try_cmd(c,["receive_float",10**i],10**(i+1),label=label)
+   
+    sys.exit()
+ 
     #--------------------------------------------------------------------------
 
     print()

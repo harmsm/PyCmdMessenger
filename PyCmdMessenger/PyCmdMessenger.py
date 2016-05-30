@@ -12,7 +12,7 @@ __author__ = "Michael J. Harms"
 __date__ = "2016-05-20"
 
 import serial
-import re, warnings, multiprocessing, time
+import re, warnings, multiprocessing, time, struct
 
 class PyCmdMessenger:
     """
@@ -28,7 +28,8 @@ class PyCmdMessenger:
                  field_separator=",",
                  command_separator=";",
                  escape_separator="/",
-                 convert_strings=True):
+                 convert_strings=True,
+                 float_precision=10):
         """
         Input:
             device:
@@ -77,6 +78,7 @@ class PyCmdMessenger:
         self.field_separator = field_separator
         self.command_separator = command_separator
         self.escape_separator = escape_separator
+        self.convert_strings = convert_strings
 
         self._esc_pattern = re.compile(r"([{}{}])".format(self.field_separator,
                                                           self.command_separator))
@@ -111,8 +113,17 @@ class PyCmdMessenger:
             err = "Command '{}' not recognized.\n".format(args[0])
             raise ValueError(err)
 
-        params = [self._esc_pattern.sub(self._esc_sub_str,"{}".format(a))
-                  for a in args[1:]]
+        params = []
+        for a in args[1:]:
+            
+            if type(a) == float:
+                params.append("{:.10e}".format(a))
+            elif type(a) == bool:
+                params.append("{}".format(int(a)))
+            else:
+                params.append("{}".format(a))
+
+        params = [self._esc_pattern.sub(self._esc_sub_str,p) for p in params]
 
         strings = ["{}".format(command_as_int)]
         strings.extend(params)
@@ -135,6 +146,30 @@ class PyCmdMessenger:
             message = self._serial_handle.readline().decode().strip("\r\n")
 
         return self._parse_message(message)
+
+    def receive_bin(self,fmt):
+        
+        with self._lock:
+            message = self._serial_handle.readline()
+
+        fmt_list = list(fmt)
+
+        messages = message.split(b';')
+        fields = messages[0].split(b',')
+    
+        if len(fields) != len(fmt_list) + 1:
+            err = "STUFF"
+            raise ValueError(err)
+
+        print(messages)
+
+        cmd = fields[0].decode()
+        values = []
+        for i in range(len(fmt_list)):
+            values.append(struct.unpack(fmt_list[i],fields[i+1]))
+
+
+        return time.time(),cmd,values
 
     def receive_from_listener(self,warn=True):
         """
@@ -205,6 +240,13 @@ class PyCmdMessenger:
             self._listener_thread.terminate() 
             self._listener_thread = None
 
+    def close(self):
+        """
+        Close the serial connection.
+        """
+
+        self._serial_handle.close()
+
     def _parse_message(self,message):
         """
         Parse the output of a message (with trailing '\r\n' already stripped),
@@ -258,19 +300,24 @@ class PyCmdMessenger:
         # Parse all of the fields
         field_out = []
         for f in fields[1:]:
+            
+            if self.convert_strings:
 
-            try:
-                float(f)
+                try:
+                    float(f)
 
-                if len(f.split(".")) == 1:
-                    # integer
-                    field_out.append(int(f))
-                else:
-                    # float
-                    field_out.append(float(f))
+                    if len(f.split(".")) == 1:
+                        # integer
+                        field_out.append(int(f))
+                    else:
+                        # float
+                        field_out.append(float(f))
 
-            except ValueError:
-                # keep as a string
+                except ValueError:
+                    # keep as a string
+                    field_out.append(f)
+
+            else:
                 field_out.append(f)
 
         return message_time, command, field_out
