@@ -25,3 +25,10 @@ class PCMBadSpecError(PyCmdMessengerError):
     """
 
     pass
+
+class PCMOverflowError(PyCmdMessengerError):
+    """
+    Error thrown if a value is too big for current board.
+    """
+
+    pass

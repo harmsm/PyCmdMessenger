@@ -76,6 +76,17 @@ class CmdMessenger:
         self._byte_field_sep = self.field_separator.encode("ascii")
         self._byte_command_sep = self.command_separator.encode("ascii")
         self._byte_escape_sep = self.escape_separator.encode("ascii")
+        self._escaped_characters = [self._byte_field_sep,
+                                    self._byte_command_sep,
+                                    self._byte_escape_sep,
+                                    b'\0']
+
+        self._null_escape = re.compile(b'\0')
+        self._remove_null_escape = re.compile(self._byte_escape_sep + b'\0')
+        self._escape_re = re.compile("([{}{}{}\0])".format(self.field_separator,
+                                                           self.command_separator,
+                                                           self.escape_separator).encode('ascii'))
+
 
         self._send_methods = {"c":self._send_char,
                               "i":self._send_int,
@@ -141,8 +152,6 @@ class CmdMessenger:
                 # if not, guess for all arguments
                 arg_format_list = ["g" for i in range(len(args))]
 
-        print(args)
-
         if len(arg_format_list) != len(args):
             err = "Number of argument formats must match the number of arguments."
             raise ValueError(err)
@@ -155,6 +164,9 @@ class CmdMessenger:
 
         # Make something that looks like cmd,field1,field2,field3;
         compiled_bytes = self._byte_field_sep.join(fields) + self._byte_command_sep
+
+        # Escape \0 characters in final compiled binary bytes
+        compiled_bytes = self._null_escape.sub(self._byte_escape_sep + b'\0',compiled_bytes)
 
         # Send the message (waiting for lock in case a listener or receive
         # command is going). 
@@ -173,52 +185,72 @@ class CmdMessenger:
 
         with self._lock:
 
-            # Read serial input until nothing or a command ending character is 
-            # reached
-            msg = []
-            tmp = b'XXX'
-            while tmp != self._byte_command_sep and tmp != b'':
+            # Read serial input until a command separator or empty character is
+            # reached 
+            msg = [[]]
+            raw_msg = []
+            escaped = False
+            command_sep_found = False
+            while True:
 
                 tmp = self.board.read()
+                raw_msg.append(tmp)
 
-                # Deal with escaped cmd separators (e.g. test/;this -> test;this)
-                if tmp == self._byte_command_sep and msg[-1] == self._byte_escape_sep:
-                    msg[-1] == tmp
-                    tmp = b'XXX' 
-                else: 
-                    msg.append(tmp)
-        
- 
+                if escaped:
+
+                    # Either drop the escape character or, if this wasn't really
+                    # an escape, keep previous escape character and new character
+                    if tmp in self._escaped_characters:
+                        msg[-1].append(tmp)
+                        escaped = False
+                    else:
+                        msg[-1].append(self._byte_escape_sep)
+                        msg[-1].append(tmp)
+                        escaped = False
+
+                else:
+
+                    # look for escape character
+                    if tmp == self._byte_escape_sep:
+                        escaped = True
+
+                    # or field separator
+                    elif tmp == self._byte_field_sep:
+                        msg.append([])
+    
+                    # or command separator
+                    elif tmp == self._byte_command_sep:
+                        command_sep_found = True
+                        break
+
+                    # or any empty characater 
+                    elif tmp == b'':
+                        break
+
+                    # okay, must be something
+                    else:
+                        msg[-1].append(tmp)
+       
         # No message received given timeouts
-        if len(msg) == 0:
+        if len(msg) == 1 and len(msg[0]) == 0:
             return None
+
+        # Make sure the message terminated properly
+        if not command_sep_found:
+          
+            # empty message (likely from line endings being included) 
+            joined_raw = b''.join(raw_msg) 
+            if joined_raw.strip() == b'':
+                return  None
+            
+            err = "Incomplete message ({})".format(joined_raw.decode())
+            raise exceptions.PCMMangledMessageError(err)
 
         # Record the time the message arrived
         message_time = time.time()
 
-        # Reassmble the message into a string 
-        joined_msg = b''.join(msg).strip()
-
-        # Make sure the message terminated properly
-        if msg[-1] != self._byte_command_sep:
-           
-            # empty message (likely from line endings being included) 
-            if joined_msg.strip() == b'':
-                return  None
-            
-            err = "Incomplete message ({})".format(joined_msg.decode())
-            raise exceptions.PCMMangledMessageError(err)
-
-        # Split on field separator (e.g. ',')
-        tmp_fields = joined_msg[:-1].split(self._byte_field_sep)
-
-        # Combine fields based on escaped separators (e.g. x/,x -> x,x)
-        fields = [tmp_fields[0]]
-        for i in range(1,len(tmp_fields)):
-            if fields[i-1][-1] == self._byte_escape_sep:
-                fields[i-1] = b''.join(fields[i-1][:-1],tmp_fields[i])
-            else:
-                fields.append(tmp_fields[i])
+        # Turn message into fields
+        fields = [b''.join(m) for m in msg]
 
         # Get the command name.
         cmd = fields[0].strip().decode()
@@ -245,11 +277,10 @@ class CmdMessenger:
                 # if not, guess for all arguments
                 arg_format_list = ["g" for i in range(len(fields[1:]))]
 
-        print(fields)
         if len(arg_format_list) != len(fields[1:]):
             err = "Number of argument formats must match the number of arguments."
             raise ValueError(err)
-      
+
         received = []
         for i, f in enumerate(fields[1:]):
             received.append(self._recv_methods[arg_format_list[i]](f))
@@ -292,9 +323,9 @@ class CmdMessenger:
         # Range check
         if value > self.board.int_max or value < self.board.int_min:
             err = "Value {} exceeds the size of the board's int.".format(value)
-            raise ValueError(err)
+            raise OverflowError(err)
            
-        return struct.pack("i",value)
+        return struct.pack(self.board.int_type,value)
  
     def _send_unsigned_int(self,value):
         """
@@ -312,9 +343,9 @@ class CmdMessenger:
         # Range check
         if value > self.board.unsigned_int_max or value < self.board.unsigned_int_min:
             err = "Value {} exceeds the size of the board's unsigned int.".format(value)
-            raise ValueError(err)
+            raise OverflowError(err)
            
-        return struct.pack("I",value)
+        return struct.pack(self.board.unsigned_int_type,value)
 
     def _send_long(self,value):
         """
@@ -333,9 +364,9 @@ class CmdMessenger:
         # Range check
         if value > self.board.long_max or value < self.board.long_min:
             err = "Value {} exceeds the size of the board's long.".format(value)
-            raise ValueError(err)
+            raise OverflowError(err)
            
-        return struct.pack("l",value)
+        return struct.pack(self.board.long_type,value)
  
     def _send_unsigned_long(self,value):
         """
@@ -354,9 +385,9 @@ class CmdMessenger:
         # Range check
         if value > self.board.unsigned_long_max or value < self.board.unsigned_long_min:
             err = "Value {} exceeds the size of the board's unsigned long.".format(value)
-            raise ValueError(err)
-           
-        return struct.pack("L",value)
+            raise OverflowError(err)
+          
+        return struct.pack(self.board.unsigned_long_type,value)
 
     def _send_float(self,value):
         """
@@ -371,15 +402,9 @@ class CmdMessenger:
         # Range check
         if value > self.board.float_max or value < self.board.float_min:
             err = "Value {} exceeds the size of the board's float.".format(value)
-            raise ValueError(err)
+            raise OverflowError(err)
 
-        if self.board.float_bytes == 4:
-            return struct.pack("f",value)
-        elif self.board.float_bytes == 8:
-            return struct.pack("d",value)
-        else:
-            err = "float bytes should be 4 (32 bit) or 8 (64 bit)"
-            raise exceptions.PCMBadSpecError(err)
+        return struct.pack(self.board.float_type,value)
  
     def _send_double(self,value):
         """
@@ -394,27 +419,24 @@ class CmdMessenger:
         # Range check
         if value > self.board.float_max or value < self.board.float_min:
             err = "Value {} exceeds the size of the board's float.".format(value)
-            raise ValueError(err)
+            raise OverflowError(err)
 
-        if self.board.float_bytes == 4:
-            return struct.pack("f",value)
-        elif self.board.float_bytes == 8:
-            return struct.pack("d",value)
-        else:
-            err = "double bytes should be 4 (32 bit) or 8 (64 bit)"
-            raise exceptions.PCMBadSpecError(err)
-        
+        return struct.pack(self.board.double_type,value)
 
     def _send_string(self,value):
         """
         Convert a string to a bytes object.  If value is not a string, it is
-        be converted to one with a standard string.format call.
+        be converted to one with a standard string.format call.  Finally, all
+        command and field separators are escaped with an escape character.
         """
 
-        if type(value) == bytes:
-            return value
+        if type(value) != bytes:
+            value = "{}".format(value).encode("ascii")
 
-        return "{}".format(value).encode("ascii")
+        # Escape command separator, field separator, escape, and nulls
+        value = self._escape_re.sub(self._byte_escape_sep + rb'\1',value)
+
+        return value
 
     def _send_bool(self,value):
         """
@@ -462,57 +484,44 @@ class CmdMessenger:
 
     def _recv_int(self,value):
         """
-        Recieve a 4-byte int in binary format, returning as python int.
+        Recieve an int in binary format, returning as python int.
         """
-
-        return struct.unpack("i",value)[0]
+        return struct.unpack(self.board.int_type,value)[0]
 
     def _recv_unsigned_int(self,value):
         """
-        Recieve a 4-byte unsigned int in binary format, returning as python int.
+        Recieve an unsigned int in binary format, returning as python int.
         """
 
-        return struct.unpack("I",value)[0]
+        return struct.unpack(self.board.unsigned_int_type,value)[0]
 
     def _recv_long(self,value):
         """
-        Recieve a 4-byte long in binary format, returning as python int.
+        Recieve a long in binary format, returning as python int.
         """
 
-        return struct.unpack("l",value)[0]
+        return struct.unpack(self.board.long_type,value)[0]
 
     def _recv_unsigned_long(self,value):
         """
-        Recieve a 4-byte unsigned long in binary format, returning as python int.
+        Recieve an unsigned long in binary format, returning as python int.
         """
 
-        return struct.unpack("L",value)[0]
+        return struct.unpack(self.board.unsigned_long_type,value)[0]
 
     def _recv_float(self,value):
         """
         Recieve a float in binary format, returning as python float.
         """
 
-        if self.board.float_bytes == 4:
-            return struct.unpack("f",value)[0]
-        elif self.board.float_bytes == 8:
-            return struct.unpack("d",value)[0]
-        else:
-            err = "Cannot parse float of {} bytes.".format(self.board.float_bytes)
-            raise ValueError(err)
+        return struct.unpack(self.board.float_type,value)[0]
 
     def _recv_double(self,value):
         """
         Recieve a double in binary format, returning as python float.
         """
 
-        if self.board.double_bytes == 4:
-            return struct.unpack("f",value)[0]
-        elif self.board.double_bytes == 8:
-            return struct.unpack("d",value)[0]
-        else:
-            err = "Cannot parse float of {} bytes.".format(self.board.double_bytes)
-            raise ValueError(err)
+        return struct.unpack(self.board.float_type,value)[0]
             
     def _recv_string(self,value):
         """
@@ -566,17 +575,6 @@ class CmdMessenger:
 
         # Return as string
         return self._recv_string(value)
-
-
-
-
-
-
-
-
-
-
-
 
 
 

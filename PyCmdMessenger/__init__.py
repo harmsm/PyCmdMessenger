@@ -9,4 +9,4 @@ __all__ = ["PyCmdMessenger","arduino","exceptions"]
 
 from .PyCmdMessenger import CmdMessenger as CmdMessenger
 from .arduino import ArduinoBoard as ArduinoBoard
-from .exceptions import PyCmdMessengerError, PCMMangledMessageError, PCMBadSpecError
+from .exceptions import PyCmdMessengerError, PCMMangledMessageError, PCMBadSpecError, PCMOverflowError

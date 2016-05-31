@@ -59,7 +59,10 @@ class ArduinoBoard:
                                   self.baud_rate,
                                   timeout=self.timeout)
 
+        #----------------------------------------------------------------------
         # Figure out proper type limits given the board specifications
+        #----------------------------------------------------------------------
+
         self.int_min = -2**(8*self.int_bytes-1)
         self.int_max = 2**(8*self.int_bytes-1) - 1
 
@@ -92,6 +95,47 @@ class ArduinoBoard:
         else:
             err = "double bytes should be 4 (32 bit) or 8 (64 bit)"
             raise PCMBadSpecError(err)
+
+        #----------------------------------------------------------------------
+        # Create a self.XXX_type for each type based on its byte number. This
+        # type can then be passed into struct.pack and struct.unpack calls to
+        # properly format the bytes strings.
+        #----------------------------------------------------------------------
+
+        INTEGER_TYPE = {2:"h",4:"i",8:"l"}
+        UNSIGNED_INTEGER_TYPE = {2:"H",4:"I",8:"L"}
+        FLOAT_TYPE = {4:"f",8:"d"}
+
+        try:
+            self.int_type = INTEGER_TYPE[self.int_bytes]
+            self.unsigned_int_type = UNSIGNED_INTEGER_TYPE[self.int_bytes]
+        except KeyError:
+            keys = list(INTEGER_TYPE.keys())
+            keys.sort()
+            
+            err = "integer bytes must be one of {}".format(keys())
+            raise PCMBadSpecError(err)
+
+        try:
+            self.long_type = INTEGER_TYPE[self.long_bytes]
+            self.unsigned_long_type = UNSIGNED_INTEGER_TYPE[self.long_bytes]
+        except KeyError:
+            keys = list(INTEGER_TYPE.keys())
+            keys.sort()
+            
+            err = "long bytes must be one of {}".format(keys())
+            raise PCMBadSpecError(err)
+    
+        try:
+            self.float_type = FLOAT_TYPE[self.float_bytes]
+            self.double_type = FLOAT_TYPE[self.double_bytes]
+        except KeyError:
+            keys = list(self.FLOAT_TYPE.keys())
+            keys.sort()
+            
+            err = "float and double bytes must be one of {}".format(keys())
+            raise PCMBadSpecError(err)
+
 
     def read(self):
         """
