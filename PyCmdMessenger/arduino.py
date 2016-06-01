@@ -84,7 +84,7 @@ class ArduinoBoard:
             self.float_max =  1e308
         else:
             err = "float bytes should be 4 (32 bit) or 8 (64 bit)"
-            raise PCMBadSpecError(err)
+            raise ValueError(err)
         
         if self.double_bytes == 4: 
             self.double_min = -3.4028235E+38
@@ -94,7 +94,7 @@ class ArduinoBoard:
             self.double_max =  1e308
         else:
             err = "double bytes should be 4 (32 bit) or 8 (64 bit)"
-            raise PCMBadSpecError(err)
+            raise ValueError(err)
 
         #----------------------------------------------------------------------
         # Create a self.XXX_type for each type based on its byte number. This
@@ -114,7 +114,7 @@ class ArduinoBoard:
             keys.sort()
             
             err = "integer bytes must be one of {}".format(keys())
-            raise PCMBadSpecError(err)
+            raise ValueError(err)
 
         try:
             self.long_type = INTEGER_TYPE[self.long_bytes]
@@ -124,7 +124,7 @@ class ArduinoBoard:
             keys.sort()
             
             err = "long bytes must be one of {}".format(keys())
-            raise PCMBadSpecError(err)
+            raise ValueError(err)
     
         try:
             self.float_type = FLOAT_TYPE[self.float_bytes]
@@ -134,7 +134,7 @@ class ArduinoBoard:
             keys.sort()
             
             err = "float and double bytes must be one of {}".format(keys())
-            raise PCMBadSpecError(err)
+            raise ValueError(err)
 
 
     def read(self):

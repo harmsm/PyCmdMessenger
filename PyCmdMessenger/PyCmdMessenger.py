@@ -5,17 +5,13 @@ __description__ = \
 PyCmdMessenger
 
 Class for communication with an arduino using the CmdMessenger serial
-communication library.  This class requires the baud rate and separators 
-match between the PyCmdMessenger class instance and the arduino sketch.  The 
-library also assumes the serial data are binary strings, and that each 
-command sent by the arduino has a \r\n line-ending.  
+communication library.  
 """
 __author__ = "Michael J. Harms"
 __date__ = "2016-05-20"
 
 import serial
 import re, warnings, multiprocessing, time, struct
-from . import exceptions
 
 class CmdMessenger:
     """
@@ -29,7 +25,8 @@ class CmdMessenger:
                  command_formats=None,
                  field_separator=",",
                  command_separator=";",
-                 escape_separator="/"):
+                 escape_separator="/",
+                 warnings=True):
         """
         Input:
             board_instance:
@@ -55,6 +52,10 @@ class CmdMessenger:
             escape_separator:
                 escape character to allow separators within messages.
                 Default: "/"
+
+            warnings:
+                warnings for user
+                Default: True
  
             The separators and escape_separator should match what's
             in the arduino code that initializes the CmdMessenger.  The default
@@ -64,15 +65,16 @@ class CmdMessenger:
         self.board = board_instance
 
         self.command_names = command_names[:]
-        self._cmd_name_to_int = dict([(n,i)
-                                      for i,n in enumerate(self.command_names)])
+        self._cmd_name_to_int = dict([(n,i) for i,n in enumerate(self.command_names)])
 
         self._cmd_name_to_format = {}
 
         self.field_separator = field_separator
         self.command_separator = command_separator
         self.escape_separator = escape_separator
-   
+  
+        self.give_warnings = warnings
+ 
         self._byte_field_sep = self.field_separator.encode("ascii")
         self._byte_command_sep = self.command_separator.encode("ascii")
         self._byte_escape_sep = self.escape_separator.encode("ascii")
@@ -81,12 +83,10 @@ class CmdMessenger:
                                     self._byte_escape_sep,
                                     b'\0']
 
-        self._null_escape = re.compile(b'\0')
-        self._remove_null_escape = re.compile(self._byte_escape_sep + b'\0')
+        self._null_escape_re = re.compile(b'\0')
         self._escape_re = re.compile("([{}{}{}\0])".format(self.field_separator,
                                                            self.command_separator,
                                                            self.escape_separator).encode('ascii'))
-
 
         self._send_methods = {"c":self._send_char,
                               "i":self._send_int,
@@ -109,13 +109,6 @@ class CmdMessenger:
                               "s":self._recv_string,
                               "?":self._recv_bool,
                               "g":self._recv_guess}
-
-
-        ## MULTITHREADING -------- DO XXX KEEP?
-        self._listener_thread = None
-        self._listener_manager = multiprocessing.Manager()
-        self._received_messages = self._listener_manager.list()
-        self._lock = multiprocessing.RLock()
 
     def send(self,cmd,*args,arg_formats=None):
         """
@@ -147,7 +140,7 @@ class CmdMessenger:
             try:
                 # See if class was initialized with a format for arguments to this
                 # command
-                arg_formats = self._cmd_name_to_format[cmd]
+                arg_format_list = self._cmd_name_to_format[cmd]
             except KeyError:
                 # if not, guess for all arguments
                 arg_format_list = ["g" for i in range(len(args))]
@@ -166,12 +159,11 @@ class CmdMessenger:
         compiled_bytes = self._byte_field_sep.join(fields) + self._byte_command_sep
 
         # Escape \0 characters in final compiled binary bytes
-        compiled_bytes = self._null_escape.sub(self._byte_escape_sep + b'\0',compiled_bytes)
+        compiled_bytes = self._null_escape_re.sub(self._byte_escape_sep + b'\0',
+                                                  compiled_bytes)
 
-        # Send the message (waiting for lock in case a listener or receive
-        # command is going). 
-        with self._lock:
-            self.board.write(compiled_bytes)
+        # Send the message.
+        self.board.write(compiled_bytes)
 
     def receive(self,arg_formats=None):
         """
@@ -183,54 +175,52 @@ class CmdMessenger:
         basis when the class was initialized.  
         """
 
-        with self._lock:
+        # Read serial input until a command separator or empty character is
+        # reached 
+        msg = [[]]
+        raw_msg = []
+        escaped = False
+        command_sep_found = False
+        while True:
 
-            # Read serial input until a command separator or empty character is
-            # reached 
-            msg = [[]]
-            raw_msg = []
-            escaped = False
-            command_sep_found = False
-            while True:
+            tmp = self.board.read()
+            raw_msg.append(tmp)
 
-                tmp = self.board.read()
-                raw_msg.append(tmp)
+            if escaped:
 
-                if escaped:
-
-                    # Either drop the escape character or, if this wasn't really
-                    # an escape, keep previous escape character and new character
-                    if tmp in self._escaped_characters:
-                        msg[-1].append(tmp)
-                        escaped = False
-                    else:
-                        msg[-1].append(self._byte_escape_sep)
-                        msg[-1].append(tmp)
-                        escaped = False
-
+                # Either drop the escape character or, if this wasn't really
+                # an escape, keep previous escape character and new character
+                if tmp in self._escaped_characters:
+                    msg[-1].append(tmp)
+                    escaped = False
                 else:
+                    msg[-1].append(self._byte_escape_sep)
+                    msg[-1].append(tmp)
+                    escaped = False
 
-                    # look for escape character
-                    if tmp == self._byte_escape_sep:
-                        escaped = True
+            else:
 
-                    # or field separator
-                    elif tmp == self._byte_field_sep:
-                        msg.append([])
-    
-                    # or command separator
-                    elif tmp == self._byte_command_sep:
-                        command_sep_found = True
-                        break
+                # look for escape character
+                if tmp == self._byte_escape_sep:
+                    escaped = True
 
-                    # or any empty characater 
-                    elif tmp == b'':
-                        break
+                # or field separator
+                elif tmp == self._byte_field_sep:
+                    msg.append([])
 
-                    # okay, must be something
-                    else:
-                        msg[-1].append(tmp)
-       
+                # or command separator
+                elif tmp == self._byte_command_sep:
+                    command_sep_found = True
+                    break
+
+                # or any empty characater 
+                elif tmp == b'':
+                    break
+
+                # okay, must be something
+                else:
+                    msg[-1].append(tmp)
+   
         # No message received given timeouts
         if len(msg) == 1 and len(msg[0]) == 0:
             return None
@@ -244,10 +234,7 @@ class CmdMessenger:
                 return  None
             
             err = "Incomplete message ({})".format(joined_raw.decode())
-            raise exceptions.PCMMangledMessageError(err)
-
-        # Record the time the message arrived
-        message_time = time.time()
+            raise EOFError(err)
 
         # Turn message into fields
         fields = [b''.join(m) for m in msg]
@@ -257,9 +244,11 @@ class CmdMessenger:
         try:
             cmd_name = self.command_names[int(cmd)]
         except (ValueError,IndexError):
-            cmd_name = "unknown"
-            w = "Recieved unrecognized command ({}).".format(cmd)
-            Warning(w)
+
+            if self.give_warnings:
+                cmd_name = "unknown"
+                w = "Recieved unrecognized command ({}).".format(cmd)
+                warnings.warn(w,Warning)
         
         # Figure out what formats to use for each argument.  
         arg_format_list = []
@@ -272,19 +261,22 @@ class CmdMessenger:
             try:
                 # See if class was initialized with a format for arguments to this
                 # command
-                arg_formats = self._cmd_name_to_format[cmd_name]
+                arg_format_list = self._cmd_name_to_format[cmd_name]
             except KeyError:
                 # if not, guess for all arguments
                 arg_format_list = ["g" for i in range(len(fields[1:]))]
 
         if len(arg_format_list) != len(fields[1:]):
-            err = "Number of argument formats must match the number of arguments."
+            err = "Number of argument formats must match the number of recieved arguments."
             raise ValueError(err)
 
         received = []
         for i, f in enumerate(fields[1:]):
             received.append(self._recv_methods[arg_format_list[i]](f))
         
+        # Record the time the message arrived
+        message_time = time.time()
+
         return cmd_name, received, message_time
 
     def _send_char(self,value):
@@ -296,12 +288,16 @@ class CmdMessenger:
             err = "char requires a string or bytes array of length 1"
             raise ValueError(err)
 
-        if len(value) > 0:
-            err = "char must be a single character, not {}".format(value)
+        if len(value) != 1:
+            err = "char must be a single character, not \"{}\"".format(value)
             raise ValueError(err)
 
         if type(value) != bytes:
             value = value.encode("ascii")
+
+        if value in self._escaped_characters:
+            err = "Cannot send a control character as a single char to arduino.  Send as string instead."
+            raise OverflowError(err)
 
         return struct.pack('c',value)
 
@@ -316,9 +312,11 @@ class CmdMessenger:
         # actually be converted.
         if type(value) != int:
             new_value = int(value)
-            warn = "Coercing {} into int ({})".format(value,new_value)
-            Warning(warn)
-            value = new_value
+
+            if self.give_warnings:
+                w = "Coercing {} into int ({})".format(value,new_value)
+                warnings.warn(w,Warning)
+                value = new_value
 
         # Range check
         if value > self.board.int_max or value < self.board.int_min:
@@ -336,9 +334,11 @@ class CmdMessenger:
         # actually be converted.
         if type(value) != int:
             new_value = int(value)
-            warn = "Coercing {} into int ({})".format(value,new_value)
-            Warning(warn)
-            value = new_value
+
+            if self.give_warnings:
+                w = "Coercing {} into int ({})".format(value,new_value)
+                warnings.warn(w,Warning)
+                value = new_value
 
         # Range check
         if value > self.board.unsigned_int_max or value < self.board.unsigned_int_min:
@@ -357,9 +357,11 @@ class CmdMessenger:
         # actually be converted.
         if type(value) != int:
             new_value = int(value)
-            warn = "Coercing {} into int ({})".format(value,new_value)
-            Warning(warn)
-            value = new_value
+            
+            if self.give_warnings:
+                w = "Coercing {} into int ({})".format(value,new_value)
+                warnings.warn(w,Warning)
+                value = new_value
 
         # Range check
         if value > self.board.long_max or value < self.board.long_min:
@@ -378,9 +380,11 @@ class CmdMessenger:
         # actually be converted.
         if type(value) != int:
             new_value = int(value)
-            warn = "Coercing {} into int ({})".format(value,new_value)
-            Warning(warn)
-            value = new_value
+
+            if self.give_warnings:
+                w = "Coercing {} into int ({})".format(value,new_value)
+                warnings.warn(w,Warning)
+                value = new_value
 
         # Range check
         if value > self.board.unsigned_long_max or value < self.board.unsigned_long_min:
@@ -460,27 +464,23 @@ class CmdMessenger:
         read the values on the arduino side.
         """
 
-        if type(value) != str and type(value) != bytes:
+        if type(value) != str and type(value) != bytes and self.give_warnings:
             w = "Warning: Sending {} as a string. This can give wildly incorrect values. Consider specifying a format and sending binary data.".format(value)
-            Warning(w)
+            warnings.warn(w,Warning)
 
         if type(value) == float:
             return "{:.10e}".format(value).encode("ascii")
         elif type(value) == bool:
             return "{}".format(int(value)).encode("ascii")
         else:
-            if type(value) == bytes:
-                return value
-            else:
-                return "{}".format(value).encode("ascii")
-
+            return self._send_string(value)
 
     def _recv_char(self,value):
         """
         Recieve a char in binary format, returning as string.
         """
 
-        return struct.unpack("c",value)[0]
+        return struct.unpack("c",value)[0].decode("ascii")
 
     def _recv_int(self,value):
         """
@@ -555,8 +555,9 @@ class CmdMessenger:
         using a format specifier and binary argument passing.
         """
 
-        w = "Warning: Guessing input format for {}. This can give wildly incorrect values. Consider specifying a format and sending binary data.".format(value)
-        Warning(w)
+        if self.give_warnings:
+            w = "Warning: Guessing input format for {}. This can give wildly incorrect values. Consider specifying a format and sending binary data.".format(value)
+            warnings.warn(w,Warning)
 
         tmp_value = value.decode()
 
@@ -577,93 +578,3 @@ class CmdMessenger:
         return self._recv_string(value)
 
 
-
-
-
-
-    def receive_from_listener(self,warn=True):
-        """
-        Return messages that have been grabbed by the listener.
-        
-        Input:
-            warn: warn if the listener is not actually active.
-        """
-
-        if self._listener_thread == None and warn == True:
-            warnings.warn("Not currently listening.")
-
-        with self._lock:
-            out = self._received_messages[:]
-            self._received_messages = self._listener_manager.list()
-
-        return out
-
-    def receive_all(self):
-        """
-        Get all messages from the arduino (both from listener and the complete
-        current serial buffer).
-        """
-
-        # Grab messages already in the received_queue
-        msg_list = self.receive_from_listener(warn=False)[:]
-
-        # Now read all lines in the buffer
-        with self._lock:
-        
-            while True:
-                message = self.board.readline().decode().strip("\r\n")
-                message = self._parse_message(message)
-
-                if message != None:
-                    msg_list.append(message)
-                else:
-                    break
-        
-
-        return msg_list
-
-    def listen(self,listen_delay=0.25):
-        """
-        Listen for incoming messages on its own thread, appending to recieving
-        queue.  
-        
-        Input:
-            listen_delay: time to wait between checks (seconds)
-        """
-
-        self._listen_delay = listen_delay
-       
-        if self._listener_thread != None:
-            warnings.warn("Already listening.\n")
-        else:
-            self._listener_thread = multiprocessing.Process(target=self._listen)
-            self._listener_thread.start()
-
-    def stop_listening(self):
-        """
-        Stop an existing listening thread.
-        """
-
-        if self._listener_thread == None:
-            warnings.warn("Not currently listening.\n")
-        else:
-            self._listener_thread.terminate() 
-            self._listener_thread = None
-
-
-    def _listen(self):
-        """
-        Private function that should be run within a Process instance.  This 
-        looks for an incoming message and then appends that (timestamped) 
-        to the message queue. 
-        """
-
-        while True:
-
-            tmp = self.receive()
-            if tmp != None:
-                with self._lock:
-                    self._received_messages.append(tmp)
-
-            time.sleep(self._listen_delay)
-        
