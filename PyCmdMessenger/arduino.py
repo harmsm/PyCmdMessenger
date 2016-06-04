@@ -41,7 +41,7 @@ class ArduinoBoard:
         These can be looked up here:
             https://www.arduino.cc/en/Reference/HomePage (under data types)
 
-        The default parameters should work for most ATMega boards.
+        The default parameters work for ATMega328p boards.
         """
 
         self.device = device
@@ -164,3 +164,5 @@ class ArduinoBoard:
         """
 
         self.comm.close() 
+
+

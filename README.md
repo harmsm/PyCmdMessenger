@@ -54,7 +54,7 @@ Cmd Id, param 1, [...] , param N;
 ```
 
 The PyCmdMessenger class constructs/parses these strings, as well as sending 
-them over the serial connection via pyserial. 
+them over the serial connection via pyserial.  
 
 To ensure stable communication with PyCmdMessenger:
 
@@ -67,9 +67,7 @@ To ensure stable communication with PyCmdMessenger:
    + escape separator, so field and command separators can be sent within
      strings (default "/")
  * Baud rate must match between PyCmdMessenger class and arduino sketch. 
- * Arduino must send commands with the "\r\n" line ending. This is achieved by
-   calling the CmdMessenger::printLfCr method in the arduino setup function.
-
+    
 A basic example is shown below.  These files are in the 
 [examples](https://github.com/harmsm/PyCmdMessenger/tree/master/examples) directory.
  
@@ -96,11 +94,7 @@ enum {
 const int BAUD_RATE = 9600;
 CmdMessenger c = CmdMessenger(Serial,',',';','/');
 
-
-/* callback */
-void on_unknown_command(void){
-    c.sendCmd(error,"Command without callback.");
-}
+/* Create callback functions to deal with incoming messages */
 
 /* callback */
 void on_who_are_you(void){
@@ -111,29 +105,31 @@ void on_who_are_you(void){
 void on_sum_two_ints(void){
    
     /* Grab two integers */
-    int value1 = c.readInt16Arg();
-    int value2 = c.readInt16Arg();
+    int value1 = c.readBinArg<int>();
+    int value2 = c.readBinArg<int>();
 
     /* Send result back */ 
     c.sendCmdStart(result);
-    c.sendCmdArg(value1);
-    c.sendCmdArg(value2);
-    c.sendCmdArg(value1 + value2);
+    c.sendCmdBinArg(value1 + value2);
     c.sendCmdEnd();
 
+}
+
+/* callback */
+void on_unknown_command(void){
+    c.sendCmd(error,"Command without callback.");
 }
 
 /* Attach callbacks for CmdMessenger commands */
 void attach_callbacks(void) { 
   
-    c.attach(on_unknown_command);
     c.attach(who_are_you,on_who_are_you);
     c.attach(sum_two_ints,on_sum_two_ints);
+    c.attach(on_unknown_command);
 }
 
 void setup() {
     Serial.begin(BAUD_RATE);
-    c.printLfCr();  // <-- This is critical, as python library assumes newlines
     attach_callbacks();    
 }
 
@@ -150,72 +146,72 @@ void loop() {
 # ------------------------------------------------------------------------------
 
 import PyCmdMessenger
-import time
 
-# Initialize instance of class with appropriate device.  command_names must 
-# match names and order from arduino file.
-c = PyCmdMessenger.PyCmdMessenger("/dev/ttyACM0",
-                                  command_names=("who_are_you",
-                                                 "sum_two_ints",
-                                                 "result",
-                                                 "error"))
+# Initialize an ArduinoBoard instance.  This is where you specify baud rate and
+# serial timeout.  If you are using a non ATmega328 board, you might also need
+# to set the data sizes (bytes for integers, longs, floats, and doubles).  
+a = PyCmdMessenger.ArduinoBoard("/dev/ttyACM0",baud_rate=9600)
 
-# Give time for the device to connect
-time.sleep(2)
+# List of command_names in arduino file. These must be in the same order as in
+# the sketch.
+command_names = ["who_are_you","sum_two_ints","result","error"]
 
-# Send and receive
+# List of data types being sent/recieved for each command, again in the same 
+# order. 
+command_formats = ["","ii","i","s"]
+
+# Initialize the messenger
+c = PyCmdMessenger.CmdMessenger(arduino,
+                                command_names=command_names,
+                                command_formats=commmand_formats)
+
+# Send
 c.send("who_are_you")
-msg = c.receive()
 
-# should give [TIME_IN_S,"result","Bob"]
+# Receive. Should give ["result","Bob",TIME_RECIEVED]
+msg = c.receive()
 print(msg)
 
 # Send with multiple parameters
 c.send("sum_two_ints",4,1)
 msg = c.receive()
 
-# should give [TIME_IN_S,"result",4,1,5]
+# should give ["result",5,TIME_RECEIVED]
 print(msg)
 ```
 
-### Python, using listener:
+## Sending from python to arduino
+| name | arduino type  | Python Type              | Receive call                                         |
+|------|---------------|--------------------------|------------------------------------------------------|
+| "b"  | bool          | bool                     | bool value = c.readBinArg<bool>();                   |
+| "i"  | int           | int                      | int value = c.readBinArg<int>();                     |
+| "I"  | unsigned int  | int                      | unsigned int value = c.readBinArg<unsigned int>();   |
+| "l"  | long          | int                      | long value = c.readBinArg<long>();                   |
+| "L"  | unsigned long | int                      | unsigned long value = c.readBinArg<unsigned long>(); |
+| "f"  | float         | float                    | float value = c.readBinArg<float>();                 |
+| "d"  | double        | float                    | double value = c.readBinArg<double>();               |
+| "c"  | char          | str or bytes, length = 1 | char value = c.readBinArg<char>();                   |
+| "s"  | char[]        | str or bytes             | char *value = c.readStringArg();                     |
 
-```python
-# ------------------------------------------------------------------------------
-# Python program using the library to interface with the arduino sketch above,
-# demonstrating the use of the listener.
-# ------------------------------------------------------------------------------
 
-import time
-import PyCmdMessenger
+// Receive single value
+int value = c.readBinArg<int>();
 
-c = PyCmdMessenger.PyCmdMessenger("/dev/ttyACM0",
-                                  command_names=("who_are_you",
-                                                 "sum_two_ints",
-                                                 "result",
-                                                 "error"))
-# wait for connection
-time.sleep(2)
+// Receive multiple values
+int value1 = c.readBinArg<int>();
+int value2 = c.readBinArg<int>();
 
-# start listening
-c.listen()
+// Send single value (COMMAND_NAME must be enumerated at top of sketch)
+c.sendBinCmd(COMMAND_NAME,value);
 
-# stop listening
-for i in range(10):
-    c.send("who_are_you")
+// Send multiple values via a single command
+c.sendCmdStart(COMMAND_NAME);
+c.sendBinArg(value1);
+c.sendBinArg(value2);
+c.sendCmdEnd();
 
-# Do other stuff.  The listener is capturing the output from the arduino on its
-# own thread right now.
-time.sleep(5)
 
-# Now grab the messages it received in the background.  This should be a list of
-# messages with timestamps.
-messages = c.receive_from_listener()
-for m in messages:
-    print(m)
 
-c.stop_listening()
-```
 
 ##Python API reference
 ----------------------
