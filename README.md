@@ -2,8 +2,8 @@
 
 Python class for communication with an arduino using the
 [CmdMessenger](https://github.com/thijse/Arduino-CmdMessenger) serial
-communication library. It allows sending and recieving of messages with
-arguments, as well as a recieving via a listener on its own thread.
+communication library. It sends and recieves messages, automatically converting
+python data types to arduino types and vice versa.  
 
 This project is not affiliated with the CmdMessenger project, though it
 obviously builds off of their excellent work.
@@ -29,7 +29,7 @@ To test the library:
  * Compatibility: python 3.x, python 2.7
  * Should work on all platforms supported by pyserial.  
  * Tested on a Raspberry Pi (raspbian) and linux machine (Ununtu 15.10).  Have 
-not tested on Windows or OSX.
+not tested on Windows or OSX, but it should work fine.
 
 ### Dependencies
  * pyserial (on local machine): https://github.com/pyserial/pyserial
@@ -43,9 +43,7 @@ in the [test/arduino](https://github.com/harmsm/PyCmdMessenger/tree/master/test/
 [examples/arduino](https://github.com/harmsm/PyCmdMessenger/tree/master/examples/arduino)
 directories. 
 
-
 ##Example code
---------------
 
 A typical CmdMessenger message has the following structure:
 
@@ -54,12 +52,15 @@ Cmd Id, param 1, [...] , param N;
 ```
 
 The PyCmdMessenger class constructs/parses these strings, as well as sending 
-them over the serial connection via pyserial. 
+them over the serial connection via pyserial.  
 
 To ensure stable communication with PyCmdMessenger:
 
  * PyCmdMessenger instances must be given a list of command names in the *same*
    order as those commands are specified in the arduino sketch.  
+ * PyCmdMessenger instances should be given a list of the data types for each 
+   command in the *same* order as those commands are specified in the arduino
+   sketch.
  * Separators must match between the PyCmdMessenger instance and the arduino
    sketch. 
    + field separator (default ",")
@@ -67,13 +68,11 @@ To ensure stable communication with PyCmdMessenger:
    + escape separator, so field and command separators can be sent within
      strings (default "/")
  * Baud rate must match between PyCmdMessenger class and arduino sketch. 
- * Arduino must send commands with the "\r\n" line ending. This is achieved by
-   calling the CmdMessenger::printLfCr method in the arduino setup function.
-
+    
 A basic example is shown below.  These files are in the 
 [examples](https://github.com/harmsm/PyCmdMessenger/tree/master/examples) directory.
  
-###Arduino sketch
+###Arduino
 
 ```C
 
@@ -87,8 +86,9 @@ A basic example is shown below.  These files are in the
 /* Define available CmdMessenger commands */
 enum {
     who_are_you,
+    my_name_is,
     sum_two_ints,
-    result,
+    sum_is,
     error,
 };
 
@@ -96,50 +96,49 @@ enum {
 const int BAUD_RATE = 9600;
 CmdMessenger c = CmdMessenger(Serial,',',';','/');
 
-
-/* callback */
-void on_unknown_command(void){
-    c.sendCmd(error,"Command without callback.");
-}
+/* Create callback functions to deal with incoming messages */
 
 /* callback */
 void on_who_are_you(void){
-    c.sendCmd(result,"Bob");
+    c.sendCmd(my_name_is,"Bob");
 }
 
 /* callback */
 void on_sum_two_ints(void){
    
     /* Grab two integers */
-    int value1 = c.readInt16Arg();
-    int value2 = c.readInt16Arg();
+    int value1 = c.readBinArg<int>();
+    int value2 = c.readBinArg<int>();
 
     /* Send result back */ 
-    c.sendCmdStart(result);
-    c.sendCmdArg(value1);
-    c.sendCmdArg(value2);
-    c.sendCmdArg(value1 + value2);
+    c.sendCmdStart(sum_is);
+    c.sendCmdBinArg(value1 + value2);
     c.sendCmdEnd();
 
+}
+
+/* callback */
+void on_unknown_command(void){
+    c.sendCmd(error,"Command without callback.");
 }
 
 /* Attach callbacks for CmdMessenger commands */
 void attach_callbacks(void) { 
   
-    c.attach(on_unknown_command);
     c.attach(who_are_you,on_who_are_you);
     c.attach(sum_two_ints,on_sum_two_ints);
+    c.attach(on_unknown_command);
 }
 
 void setup() {
     Serial.begin(BAUD_RATE);
-    c.printLfCr();  // <-- This is critical, as python library assumes newlines
     attach_callbacks();    
 }
 
 void loop() {
     c.feedinSerialData();
 }
+
 ```
 
 ### Python
@@ -150,108 +149,170 @@ void loop() {
 # ------------------------------------------------------------------------------
 
 import PyCmdMessenger
-import time
 
-# Initialize instance of class with appropriate device.  command_names must 
-# match names and order from arduino file.
-c = PyCmdMessenger.PyCmdMessenger("/dev/ttyACM0",
-                                  command_names=("who_are_you",
-                                                 "sum_two_ints",
-                                                 "result",
-                                                 "error"))
+# Initialize an ArduinoBoard instance.  This is where you specify baud rate and
+# serial timeout.  If you are using a non ATmega328 board, you might also need
+# to set the data sizes (bytes for integers, longs, floats, and doubles).  
+arduino = PyCmdMessenger.ArduinoBoard("/dev/ttyACM0",baud_rate=9600)
 
-# Give time for the device to connect
-time.sleep(2)
+# List of command_names in arduino file. These must be in the same order as in
+# the sketch.
+command_names = ["who_are_you","my_name_is","sum_two_ints","sum_is","error"]
 
-# Send and receive
+# List of data types being sent/recieved for each command, again in the same 
+# order. 
+command_formats = ["","s","ii","i","s"]
+
+# Initialize the messenger
+c = PyCmdMessenger.CmdMessenger(arduino,
+                                command_names=command_names,
+                                command_formats=command_formats)
+
+# Send
 c.send("who_are_you")
+# Receive. Should give ["my_name_is",["Bob"],TIME_RECIEVED]
 msg = c.receive()
-
-# should give [TIME_IN_S,"result","Bob"]
 print(msg)
 
 # Send with multiple parameters
 c.send("sum_two_ints",4,1)
 msg = c.receive()
 
-# should give [TIME_IN_S,"result",4,1,5]
+# should give ["sum_is",[5],TIME_RECEIVED]
 print(msg)
 ```
 
-### Python, using listener:
+##Format arguments
 
-```python
-# ------------------------------------------------------------------------------
-# Python program using the library to interface with the arduino sketch above,
-# demonstrating the use of the listener.
-# ------------------------------------------------------------------------------
+The format for each argument sent with a command (or received with a command)
+is determined by the command_formats list passed to the CmdMessenger class (see
+example above). Alternatively, it can be specified by the keyword arg_formats
+passed directly to the `send` or `receive` methods.  The format specification
+is in the table below.  If a given command returns a single float value, the
+format string for that command would be `"f"`.  If it returns five floats, the
+format string would be `"fffff"`.  The types can be mixed and matched at will.
+`"sibbf"` would specify a command that sends or receives five arguments that are
+a string, integer, bool, bool, and float.  If no argument is associated with a
+command, an empty string (`""`) or `None` can be used for the format.
 
-import time
-import PyCmdMessenger
+###Format reference table
 
-c = PyCmdMessenger.PyCmdMessenger("/dev/ttyACM0",
-                                  command_names=("who_are_you",
-                                                 "sum_two_ints",
-                                                 "result",
-                                                 "error"))
-# wait for connection
-time.sleep(2)
+| format | arduino type  | Python Type              | Arduino receive                                       | Arduino send                        |
+|--------|---------------|--------------------------|-------------------------------------------------------|-------------------------------------|
+| "b"    | bool          | bool                     | `bool value = c.readBinArg<bool>();`                  | `c.sendBinCmd(COMMAND_NAME,value);` |
+| "i"    | int           | int                      | `int value = c.readBinArg<int>();`                    | `c.sendBinCmd(COMMAND_NAME,value);` |
+| "I"    | unsigned int  | int                      | `unsigned int value = c.readBinArg<unsigned int>();`  | `c.sendBinCmd(COMMAND_NAME,value);` |
+| "l"    | long          | int                      | `long value = c.readBinArg<long>();`                  | `c.sendBinCmd(COMMAND_NAME,value);` |
+| "L"    | unsigned long | int                      | `unsigned long value = c.readBinArg<unsigned long>();`| `c.sendBinCmd(COMMAND_NAME,value);` |
+| "f"    | float         | float                    | `float value = c.readBinArg<float>();`                | `c.sendBinCmd(COMMAND_NAME,value);` |
+| "d"    | double        | float                    | `double value = c.readBinArg<double>();`              | `c.sendBinCmd(COMMAND_NAME,value);` |
+| "c"    | char          | str or bytes, length = 1 | `char value = c.readBinArg<char>();`                  | `c.sendBinCmd(COMMAND_NAME,value);` |
+| "s"    | char[]        | str or bytes             | `char value[SIZE] = c.readStringArg();`               | `c.sendCmd(COMMAND_NAME,value);`    |
 
-# start listening
-c.listen()
+PyCmdMessenger takes care of type conversion before anything is sent over the
+serial connection.  For example, if the user sends an integer as an `"f"`
+(float), PyCmdMessenger will run `float(value)` in python before passing it.
+It will warn the user for destructive conversions (say, a float to an
+integer).  It will throw a `ValueError` if the conversion cannot be done (e.g.
+the string 'ABC' to integer).  It will throw an `OverflowError` if the passed
+value cannot be accomodated in the specififed arduino data type (say, by
+passing an integer greater than 32767 to a 2-byte integer, or a negative number
+to an unsigned int).  The sizes for each arduino type are determined by the
+`XXX_bytes` attributes of the ArduinoBoard class.  
 
-# stop listening
-for i in range(10):
-    c.send("who_are_you")
+With the exception of strings, all data are passed in binary format.  This both
+minimizes the number of bits sent and makes sure the sent values are accurate. 
+While you can technically send a float as a string to the arduino, then 
+convert it to a float via `atof`, this is extremely unreliable.  
 
-# Do other stuff.  The listener is capturing the output from the arduino on its
-# own thread right now.
-time.sleep(5)
+PyCmdMessenger will also automatically escape separators in strings, both on 
+sending and receiving.  For example, the default field separator is `,` an
+dthe default escape character is `/`.  If the user sends the string 
+`Hello, my name is Bob.`, PyCmdMessenger will convert this to 
+`Hello/, my name is Bob.`  CmdMessenger on the arduino will strip out the 
+escape character when received.  The same behavior should hold for recieving
+from the arduino.  
 
-# Now grab the messages it received in the background.  This should be a list of
-# messages with timestamps.
-messages = c.receive_from_listener()
-for m in messages:
-    print(m)
+##Testing
 
-c.stop_listening()
+The [test](https://github.com/harmsm/PyCmdMessenger/tree/master/test) directory
+has an arduino sketch that can be compiled and loaded onto an arudino, as well
+as a python test script, `pingpong_test.py`.  This will send a wide range of
+values for every data type back and forth to the arduino, reporting success and
+failure.  The first phase of the testing passes values in binary and should
+work, giving no errors.  The second phase of the testing passes values as
+plain-text strings. It will likely fail horribly.  PyCmdMessenger does not use
+that interface unless forced to because the user did not specify a format for
+the data being passed. 
+
+##Quick reference for CmdMessenger on arduino side
+For more details, see the [CmdMessenger](https://github.com/thijse/Arduino-CmdMessenger) project page.
+
+###Receiving
+```C
+/* c is an instance of CmdMessenger (see example sketch above) */
+/* ------- For all types except strings (replace TYPE appropriately) --------*/
+int value = c.readBinArg<TYPE>();
+
+/* ----- For strings (replace BUFFER_SIZE with maximum string length) ------ */
+char string[BUFFER_SIZE] = c.readStringArg();
+
+```
+###Sending
+```C
+/* COMMAND_NAME must be enumerated at the top of the sketch.  c is an instance
+ * of CmdMessenger (see example sketch above) */
+
+/* ------------------- For all types except strings ------------------------*/
+
+// Send single value
+c.sendBinCmd(COMMAND_NAME,value);
+
+// Send multiple values via a single command
+c.sendCmdStart(COMMAND_NAME);
+c.sendCmdBinArg(value1);
+c.sendCmdBinArg(value2);
+// ...
+// ...
+c.sendCmdEnd();
+
+/* ------------------------- For strings ------------------------------------- */
+// Send single string 
+c.sendCmd(COMMAND_NAME,string);
+
+// Send multiple strings via a single command
+c.sendCmdStart(COMMAND_NAME);
+c.sendCmdArg(string1);
+c.sendCmdArg(string2);
+// ...
+// ...
+c.sendCmdEnd();
 ```
 
-##Python API reference
-----------------------
+##Python Classes
 
-####Module PyCmdMessenger
----------------------
-
-####Classes
--------
-
-PyCmdMessenger 
+```
+CmdMessenger 
     Basic interface for interfacing over a serial connection to an arduino 
     using the CmdMessenger library.
 
-    Ancestors (in MRO)
-    ------------------
-    PyCmdMessenger.PyCmdMessenger
-    builtins.object
-
     Static methods
     --------------
-    __init__(self, device, command_names, timeout=0.25, baud_rate=9600, field_separator=',', command_separator=';', escape_separator='/', convert_strings=True)
+    __init__(self, board_instance, command_names, command_formats=None, field_separator=',', command_separator=';', escape_separator='/', warnings=True)
         Input:
-        device:
-            device location (e.g. /dev/ttyACM0)
+        board_instance:
+            instance of ArduinoBoard initialized with correct serial 
+            connection (points to correct serial with correct baud rate) and
+            correct board parameters (float bytes, etc.)
 
         command_names:
             a list or tuple of the command names specified in the arduino
             .ino file *in the same order they are listed there.*  
 
-        timeout:
-            time to wait on a given serial request before giving up
-            (seconds).  Default: 0.25
-
-        baud_rate: 
-            serial baud rate. Default: 9600
+        command_formats:
+            a list or tuple of strings that specify the formats of the
+            commands in command names.  Optional but *highly* recommmended.
+            Default: None
 
         field_separator:
             character that separates fields within a message
@@ -265,56 +326,121 @@ PyCmdMessenger
             escape character to allow separators within messages.
             Default: "/"
 
-        convert_strings:
-            on receiving, try to intelligently convert parameters to
-            integers or floats. Default: True
+        warnings:
+            warnings for user
+            Default: True
 
-        The baud_rate, separators, and escape_separator should match what's
+        The separators and escape_separator should match what's
         in the arduino code that initializes the CmdMessenger.  The default
         separator values match the default values as of CmdMessenger 4.0.
 
-    listen(self, listen_delay=1)
-        Listen for incoming messages on its own thread, appending to recieving
-        queue.  
+    receive(self, arg_formats=None)
+        Recieve commands coming off the serial port. 
 
-        Input:
-            listen_delay: time to wait between checks (seconds)
+        arg_formats optional, but highly recommended if you do not initialize
+        the class instance with a command_formats argument.  The keyword  
+        specifies the formats to use to parse incoming arguments.  If specified
+        here, arg_formats supercedes command_formats specified on initialization.
 
-    receive(self)
-        Read a single serial message sent by CmdMessage library.
-
-    receive_all(self)
-        Get all messages from the arduino (both from listener and the complete
-        current serial buffer).
-
-    receive_from_listener(self, warn=True)
-        Return messages that have been grabbed by the listener.
-
-        Input:
-            warn: warn if the listener is not actually active.
-
-    send(self, *args)
+    send(self, cmd, *args)
         Send a command (which may or may not have associated arguments) to an 
         arduino using the CmdMessage protocol.  The command and any parameters
-        should be passed as direct arguments to send.  The function will convert
-        python data types to strings, as well as escaping all separator
-        characters in strings.
+        should be passed as direct arguments to send.  
 
-    stop_listening(self)
-        Stop an existing listening thread.
+        arg_formats optional, but highly recommended if you do not initialize
+        the class instance with a command_formats argument.  The keyword  
+        specifies the formats to use for each argument when passed to the
+        arduino. If specified here, arg_formats supercedes command_formats
+        specified on initialization.
 
     Instance variables
     ------------------
-    baud_rate
+    board
+
+    command_formats
 
     command_names
 
     command_separator
 
-    device
-
     escape_separator
 
     field_separator
 
+    give_warnings
+
+ArduinoBoard 
+    Class for connecting to an Arduino board over USB using PyCmdMessenger.  
+    The board holds the serial handle (which, in turn, holds the device name,
+    baud rate, and timeout) and the board parameters (size of data types in 
+    bytes, etc.).  The default parameters are for an ArduinoUno board.
+
+    Static methods
+    --------------
+    __init__(self, device, baud_rate=9600, timeout=1.0, settle_time=2.0, int_bytes=2, long_bytes=4, float_bytes=4, double_bytes=4)
+        Serial connection parameters:
+            
+            device: serial device (e.g. /dev/ttyACM0)
+            baud_rate: baud rate set in the compiled sketch
+            timeout: timeout for serial reading and writing
+            settle_time: how long to wait before trying to access serial port
+
+        Board input parameters:
+            int_bytes: number of bytes to store an integer
+            long_bytes: number of bytes to store a long
+            float_bytes: number of bytes to store a float
+            double_bytes: number of bytes to store a double
+
+        These can be looked up here:
+            https://www.arduino.cc/en/Reference/HomePage (under data types)
+
+        The default parameters work for ATMega328p boards.
+
+    close(self)
+        Close serial connection.
+
+    read(self)
+        Wrap serial read method.
+
+    readline(self)
+        Wrap serial readline method.
+
+    write(self, msg)
+        Wrap serial write method.
+
+    Instance variables
+    ------------------
+    baud_rate
+
+    comm
+
+    device
+
+    double_bytes
+
+    float_bytes
+
+    int_bytes
+
+    int_max
+
+    int_min
+
+    long_bytes
+
+    long_max
+
+    long_min
+
+    settle_time
+
     timeout
+
+    unsigned_int_max
+
+    unsigned_int_min
+
+    unsigned_long_max
+
+    unsigned_long_min
+```

@@ -8,8 +8,9 @@
 /* Define available CmdMessenger commands */
 enum {
     who_are_you,
+    my_name_is,
     sum_two_ints,
-    result,
+    sum_is,
     error,
 };
 
@@ -17,48 +18,45 @@ enum {
 const int BAUD_RATE = 9600;
 CmdMessenger c = CmdMessenger(Serial,',',';','/');
 
-
-/* callback */
-void on_unknown_command(void){
-    c.sendCmd(error,"Command without callback.");
-}
+/* Create callback functions to deal with incoming messages */
 
 /* callback */
 void on_who_are_you(void){
-    c.sendCmd(result,"Bob");
+    c.sendCmd(my_name_is,"Bob");
 }
 
 /* callback */
 void on_sum_two_ints(void){
    
     /* Grab two integers */
-    int value1 = c.readInt16Arg();
-    int value2 = c.readInt16Arg();
+    int value1 = c.readBinArg<int>();
+    int value2 = c.readBinArg<int>();
 
     /* Send result back */ 
-    c.sendCmdStart(result);
-    c.sendCmdArg(value1);
-    c.sendCmdArg(value2);
-    c.sendCmdArg(value1 + value2);
+    c.sendCmdStart(sum_is);
+    c.sendCmdBinArg(value1 + value2);
     c.sendCmdEnd();
 
+}
+
+/* callback */
+void on_unknown_command(void){
+    c.sendCmd(error,"Command without callback.");
 }
 
 /* Attach callbacks for CmdMessenger commands */
 void attach_callbacks(void) { 
   
-    c.attach(on_unknown_command);
     c.attach(who_are_you,on_who_are_you);
     c.attach(sum_two_ints,on_sum_two_ints);
+    c.attach(on_unknown_command);
 }
 
 void setup() {
     Serial.begin(BAUD_RATE);
-    c.printLfCr();  // <-- This is critical, as python library assumes newlines
     attach_callbacks();    
 }
 
 void loop() {
     c.feedinSerialData();
 }
-

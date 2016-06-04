@@ -1,49 +1,47 @@
+### COMMAND FORMATS
+
 __description__ = \
 """
 PyCmdMessenger
 
 Class for communication with an arduino using the CmdMessenger serial
-communication library.  This class requires the baud rate and separators 
-match between the PyCmdMessenger class instance and the arduino sketch.  The 
-library also assumes the serial data are binary strings, and that each 
-command sent by the arduino has a \r\n line-ending.  
+communication library.  
 """
 __author__ = "Michael J. Harms"
 __date__ = "2016-05-20"
 
 import serial
-import re, warnings, multiprocessing, time
+import re, warnings, multiprocessing, time, struct
 
-class PyCmdMessenger:
+class CmdMessenger:
     """
     Basic interface for interfacing over a serial connection to an arduino 
     using the CmdMessenger library.
     """
     
     def __init__(self,
-                 device,
+                 board_instance,
                  command_names,
-                 timeout=2.0,
-                 baud_rate=9600,
+                 command_formats=None,
                  field_separator=",",
                  command_separator=";",
                  escape_separator="/",
-                 convert_strings=True):
+                 warnings=True):
         """
         Input:
-            device:
-                device location (e.g. /dev/ttyACM0)
+            board_instance:
+                instance of ArduinoBoard initialized with correct serial 
+                connection (points to correct serial with correct baud rate) and
+                correct board parameters (float bytes, etc.)
 
             command_names:
                 a list or tuple of the command names specified in the arduino
                 .ino file *in the same order they are listed there.*  
 
-            timeout:
-                time to wait on a given serial request before giving up
-                (seconds).  Default: 2.0
-
-            baud_rate: 
-                serial baud rate. Default: 9600
+            command_formats:
+                a list or tuple of strings that specify the formats of the
+                commands in command names.  Optional but *highly* recommmended.
+                Default: None
 
             field_separator:
                 character that separates fields within a message
@@ -56,238 +54,540 @@ class PyCmdMessenger:
             escape_separator:
                 escape character to allow separators within messages.
                 Default: "/"
- 
-            convert_strings:
-                on receiving, try to intelligently convert parameters to
-                integers or floats. Default: True
 
-            The baud_rate, separators, and escape_separator should match what's
+            warnings:
+                warnings for user
+                Default: True
+ 
+            The separators and escape_separator should match what's
             in the arduino code that initializes the CmdMessenger.  The default
             separator values match the default values as of CmdMessenger 4.0. 
         """
 
-        self.device = device
+        self.board = board_instance
 
         self.command_names = command_names[:]
-        self._cmd_name_to_int = dict([(n,i)
-                                      for i,n in enumerate(self.command_names)])
+        self._cmd_name_to_int = dict([(n,i) for i,n in enumerate(self.command_names)])
 
-        self.timeout = timeout
-        self.baud_rate = baud_rate
+        self.command_formats = command_formats
+        self._cmd_name_to_format = {}
+        if self.command_formats != None:
+            if len(self.command_formats) != len(self.command_names):
+                err = "You must specify the same number of command formats and command names."
+                raise ValueError(err)
+
+            for i in range(len(self.command_names)):
+                self._cmd_name_to_format[self.command_names[i]] = self.command_formats[i]
+
         self.field_separator = field_separator
         self.command_separator = command_separator
         self.escape_separator = escape_separator
+  
+        self.give_warnings = warnings
+ 
+        self._byte_field_sep = self.field_separator.encode("ascii")
+        self._byte_command_sep = self.command_separator.encode("ascii")
+        self._byte_escape_sep = self.escape_separator.encode("ascii")
+        self._escaped_characters = [self._byte_field_sep,
+                                    self._byte_command_sep,
+                                    self._byte_escape_sep,
+                                    b'\0']
 
-        self._esc_pattern = re.compile(r"([{}{}])".format(self.field_separator,
-                                                          self.command_separator))
-        self._esc_sub_str = r"{}\\1".format(self.escape_separator)
+        self._null_escape_re = re.compile(b'\0')
+        self._escape_re = re.compile("([{}{}{}\0])".format(self.field_separator,
+                                                           self.command_separator,
+                                                           self.escape_separator).encode('ascii'))
 
-        self._serial_handle = serial.Serial(self.device,
-                                            self.baud_rate,
-                                            timeout=self.timeout)
+        self._send_methods = {"c":self._send_char,
+                              "i":self._send_int,
+                              "I":self._send_unsigned_int,
+                              "l":self._send_long,
+                              "L":self._send_unsigned_long,
+                              "f":self._send_float,
+                              "d":self._send_double,
+                              "s":self._send_string,
+                              "?":self._send_bool,
+                              "g":self._send_guess}
 
-        self._listener_thread = None
-        self._listener_manager = multiprocessing.Manager()
-        self._received_messages = self._listener_manager.list()
-        self._lock = multiprocessing.RLock()
-       
-    def send(self,*args):
+        self._recv_methods = {"c":self._recv_char,
+                              "i":self._recv_int,
+                              "I":self._recv_unsigned_int,
+                              "l":self._recv_long,
+                              "L":self._recv_unsigned_long,
+                              "f":self._recv_float,
+                              "d":self._recv_double,
+                              "s":self._recv_string,
+                              "?":self._recv_bool,
+                              "g":self._recv_guess}
+
+    def send(self,cmd,*args,arg_formats=None):
         """
         Send a command (which may or may not have associated arguments) to an 
         arduino using the CmdMessage protocol.  The command and any parameters
-        should be passed as direct arguments to send.  The function will convert
-        python data types to strings, as well as escaping all separator
-        characters.
+        should be passed as direct arguments to send.  
+
+        arg_formats optional, but highly recommended if you do not initialize
+        the class instance with a command_formats argument.  The keyword  
+        specifies the formats to use for each argument when passed to the
+        arduino. If specified here, arg_formats supercedes command_formats
+        specified on initialization.  
         """
 
-        if len(args) < 1:
-            err = "You must specify a command (and maybe parameters).\n"
-            raise ValueError(err)
-
-        # Turn arguments into strings, replacing separators with escaped separators
+        # Turn the command into an integer.
         try:
-            command_as_int = self._cmd_name_to_int[args[0]]
+            command_as_int = self._cmd_name_to_int[cmd]
         except KeyError:
-            err = "Command '{}' not recognized.\n".format(args[0])
+            err = "Command '{}' not recognized.\n".format(cmd)
             raise ValueError(err)
 
-        params = [self._esc_pattern.sub(self._esc_sub_str,"{}".format(a))
-                  for a in args[1:]]
+        # Figure out what formats to use for each argument.  
+        arg_format_list = []
+        if arg_formats != None:
 
-        strings = ["{}".format(command_as_int)]
-        strings.extend(params)
+            # The user specified formats
+            arg_format_list = list(arg_formats)
 
-        # compile the final string
-        compiled_string = "{};".format(",".join(strings))
-
-        # Send the message (waiting for lock in case a listener or receive
-        # command is going). 
-        with self._lock:
-            self._serial_handle.write(compiled_string.encode('ascii'))
-
-    def receive(self):
-        """
-        Read a single serial message sent by CmdMessage library.  
-        """
-
-        # Read raw serial
-        with self._lock:
-            message = self._serial_handle.readline().decode().strip("\r\n")
-
-        return self._parse_message(message)
-
-    def receive_from_listener(self,warn=True):
-        """
-        Return messages that have been grabbed by the listener.
-        
-        Input:
-            warn: warn if the listener is not actually active.
-        """
-
-        if self._listener_thread == None and warn == True:
-            warnings.warn("Not currently listening.")
-
-        with self._lock:
-            out = self._received_messages[:]
-            self._received_messages = self._listener_manager.list()
-
-        return out
-
-    def receive_all(self):
-        """
-        Get all messages from the arduino (both from listener and the complete
-        current serial buffer).
-        """
-
-        # Grab messages already in the received_queue
-        msg_list = self.receive_from_listener(warn=False)[:]
-
-        # Now read all lines in the buffer
-        with self._lock:
-        
-            while True:
-                message = self._serial_handle.readline().decode().strip("\r\n")
-                message = self._parse_message(message)
-
-                if message != None:
-                    msg_list.append(message)
-                else:
-                    break
-        
-
-        return msg_list
-
-    def listen(self,listen_delay=0.25):
-        """
-        Listen for incoming messages on its own thread, appending to recieving
-        queue.  
-        
-        Input:
-            listen_delay: time to wait between checks (seconds)
-        """
-
-        self._listen_delay = listen_delay
-       
-        if self._listener_thread != None:
-            warnings.warn("Already listening.\n")
         else:
-            self._listener_thread = multiprocessing.Process(target=self._listen)
-            self._listener_thread.start()
-
-    def stop_listening(self):
-        """
-        Stop an existing listening thread.
-        """
-
-        if self._listener_thread == None:
-            warnings.warn("Not currently listening.\n")
-        else:
-            self._listener_thread.terminate() 
-            self._listener_thread = None
-
-    def _parse_message(self,message):
-        """
-        Parse the output of a message (with trailing '\r\n' already stripped),
-        returning timestamp, command, and whatever parametres came out.
-
-        Possible outputs:
-
-            None (no message)
-
-            OR
-
-            (RECIEVE_TIME,cmd,[param1,param2,...,paramN])
-
-            If params are empty, they will be returned as an empty list. 
-        
-            (RECIEVE_TIME,cmd,[])
-        """
-
-        message_time = time.time()
-
-        # No message
-        if message == "":
-            return None
-
-        # Split message by command separator, ignoring escaped command separators
-        message_list = re.split(r'(?<!\{}){}'.format(self.escape_separator,
-                                                     self.command_separator),
-                                                     message)
-        
-        # Grab non-empty messages
-        message_list = [m for m in message_list if m.strip() != ""]
-
-        # Make sure that only a single message was received.
-        if len(message_list) > 1:
-            err = "Mangled message received.  Has multiple commands on one line.\n"
-            raise ValueError(err)
-
-        m = message_list[0]
-
-        # Split message on field separator, ignoring escaped separtaors
-        fields = re.split(r'(?<!\{}){}'.format(self.escape_separator,
-                                               self.field_separator),m)
-        command = fields[0]
-
-        # Try to convert the command integer into a named command string
-        try:
-            command = self.command_names[int(command)]
-        except (ValueError,IndexError):
-            pass
-
-        # Parse all of the fields
-        field_out = []
-        for f in fields[1:]:
-
             try:
-                float(f)
+                # See if class was initialized with a format for arguments to this
+                # command
+                arg_format_list = self._cmd_name_to_format[cmd]
+            except KeyError:
+                # if not, guess for all arguments
+                arg_format_list = ["g" for i in range(len(args))]
 
-                if len(f.split(".")) == 1:
-                    # integer
-                    field_out.append(int(f))
-                else:
-                    # float
-                    field_out.append(float(f))
+        if len(args) > 0:
+            if len(arg_format_list) != len(args):
+                err = "Number of argument formats must match the number of arguments."
+                raise ValueError(err)
 
-            except ValueError:
-                # keep as a string
-                field_out.append(f)
+        # Go through each argument and create a bytes representation in the
+        # proper format to send.
+        fields = ["{}".format(command_as_int).encode("ascii")]
+        for i, a in enumerate(args):
+            fields.append(self._send_methods[arg_format_list[i]](a))
 
-        return message_time, command, field_out
-      
-    def _listen(self):
+        # Make something that looks like cmd,field1,field2,field3;
+        compiled_bytes = self._byte_field_sep.join(fields) + self._byte_command_sep
+
+        # Escape \0 characters in final compiled binary bytes
+        compiled_bytes = self._null_escape_re.sub(self._byte_escape_sep + b'\0',
+                                                  compiled_bytes)
+
+        # Send the message.
+        self.board.write(compiled_bytes)
+
+    def receive(self,arg_formats=None):
         """
-        Private function that should be run within a Process instance.  This 
-        looks for an incoming message and then appends that (timestamped) 
-        to the message queue. 
+        Recieve commands coming off the serial port. 
+
+        arg_formats optional, but highly recommended if you do not initialize
+        the class instance with a command_formats argument.  The keyword  
+        specifies the formats to use to parse incoming arguments.  If specified
+        here, arg_formats supercedes command_formats specified on initialization.  
         """
 
+        # Read serial input until a command separator or empty character is
+        # reached 
+        msg = [[]]
+        raw_msg = []
+        escaped = False
+        command_sep_found = False
         while True:
 
-            tmp = self.receive()
-            if tmp != None:
-                with self._lock:
-                    self._received_messages.append(tmp)
+            tmp = self.board.read()
+            raw_msg.append(tmp)
 
-            time.sleep(self._listen_delay)
+            if escaped:
+
+                # Either drop the escape character or, if this wasn't really
+                # an escape, keep previous escape character and new character
+                if tmp in self._escaped_characters:
+                    msg[-1].append(tmp)
+                    escaped = False
+                else:
+                    msg[-1].append(self._byte_escape_sep)
+                    msg[-1].append(tmp)
+                    escaped = False
+
+            else:
+
+                # look for escape character
+                if tmp == self._byte_escape_sep:
+                    escaped = True
+
+                # or field separator
+                elif tmp == self._byte_field_sep:
+                    msg.append([])
+
+                # or command separator
+                elif tmp == self._byte_command_sep:
+                    command_sep_found = True
+                    break
+
+                # or any empty characater 
+                elif tmp == b'':
+                    break
+
+                # okay, must be something
+                else:
+                    msg[-1].append(tmp)
+  
+        # No message received given timeouts
+        if len(msg) == 1 and len(msg[0]) == 0:
+            return None
+
+        # Make sure the message terminated properly
+        if not command_sep_found:
+          
+            # empty message (likely from line endings being included) 
+            joined_raw = b''.join(raw_msg) 
+            if joined_raw.strip() == b'':
+                return  None
+           
+            err = "Incomplete message ({})".format(joined_raw.decode())
+            raise EOFError(err)
+
+        # Turn message into fields
+        fields = [b''.join(m) for m in msg]
+
+        # Get the command name.
+        cmd = fields[0].strip().decode()
+        try:
+            cmd_name = self.command_names[int(cmd)]
+        except (ValueError,IndexError):
+
+            if self.give_warnings:
+                cmd_name = "unknown"
+                w = "Recieved unrecognized command ({}).".format(cmd)
+                warnings.warn(w,Warning)
         
+        # Figure out what formats to use for each argument.  
+        arg_format_list = []
+        if arg_formats != None:
+
+            # The user specified formats
+            arg_format_list = list(arg_formats)
+
+        else:
+            try:
+                # See if class was initialized with a format for arguments to this
+                # command
+                arg_format_list = self._cmd_name_to_format[cmd_name]
+            except KeyError:
+                # if not, guess for all arguments
+                arg_format_list = ["g" for i in range(len(fields[1:]))]
+
+        if len(fields[1:]) > 0:
+            if len(arg_format_list) != len(fields[1:]):
+                err = "Number of argument formats must match the number of recieved arguments."
+                raise ValueError(err)
+
+        received = []
+        for i, f in enumerate(fields[1:]):
+            received.append(self._recv_methods[arg_format_list[i]](f))
+        
+        # Record the time the message arrived
+        message_time = time.time()
+
+        return cmd_name, received, message_time
+
+    def _send_char(self,value):
+        """
+        Convert a single char to a bytes object.
+        """
+
+        if type(value) != str and type(value) != bytes:
+            err = "char requires a string or bytes array of length 1"
+            raise ValueError(err)
+
+        if len(value) != 1:
+            err = "char must be a single character, not \"{}\"".format(value)
+            raise ValueError(err)
+
+        if type(value) != bytes:
+            value = value.encode("ascii")
+
+        if value in self._escaped_characters:
+            err = "Cannot send a control character as a single char to arduino.  Send as string instead."
+            raise OverflowError(err)
+
+        return struct.pack('c',value)
+
+
+    def _send_int(self,value):
+        """
+        Convert a numerical value into an integer, then to a bytes object Check
+        bounds for signed int.
+        """
+
+        # Coerce to int. This will throw a ValueError if the value can't 
+        # actually be converted.
+        if type(value) != int:
+            new_value = int(value)
+
+            if self.give_warnings:
+                w = "Coercing {} into int ({})".format(value,new_value)
+                warnings.warn(w,Warning)
+                value = new_value
+
+        # Range check
+        if value > self.board.int_max or value < self.board.int_min:
+            err = "Value {} exceeds the size of the board's int.".format(value)
+            raise OverflowError(err)
+           
+        return struct.pack(self.board.int_type,value)
+ 
+    def _send_unsigned_int(self,value):
+        """
+        Convert a numerical value into an integer, then to a bytes object. Check
+        bounds for unsigned int.
+        """
+        # Coerce to int. This will throw a ValueError if the value can't 
+        # actually be converted.
+        if type(value) != int:
+            new_value = int(value)
+
+            if self.give_warnings:
+                w = "Coercing {} into int ({})".format(value,new_value)
+                warnings.warn(w,Warning)
+                value = new_value
+
+        # Range check
+        if value > self.board.unsigned_int_max or value < self.board.unsigned_int_min:
+            err = "Value {} exceeds the size of the board's unsigned int.".format(value)
+            raise OverflowError(err)
+           
+        return struct.pack(self.board.unsigned_int_type,value)
+
+    def _send_long(self,value):
+        """
+        Convert a numerical value into an integer, then to a bytes object. Check
+        bounds for signed long.
+        """
+
+        # Coerce to int. This will throw a ValueError if the value can't 
+        # actually be converted.
+        if type(value) != int:
+            new_value = int(value)
+            
+            if self.give_warnings:
+                w = "Coercing {} into int ({})".format(value,new_value)
+                warnings.warn(w,Warning)
+                value = new_value
+
+        # Range check
+        if value > self.board.long_max or value < self.board.long_min:
+            err = "Value {} exceeds the size of the board's long.".format(value)
+            raise OverflowError(err)
+           
+        return struct.pack(self.board.long_type,value)
+ 
+    def _send_unsigned_long(self,value):
+        """
+        Convert a numerical value into an integer, then to a bytes object. 
+        Check bounds for unsigned long.
+        """
+
+        # Coerce to int. This will throw a ValueError if the value can't 
+        # actually be converted.
+        if type(value) != int:
+            new_value = int(value)
+
+            if self.give_warnings:
+                w = "Coercing {} into int ({})".format(value,new_value)
+                warnings.warn(w,Warning)
+                value = new_value
+
+        # Range check
+        if value > self.board.unsigned_long_max or value < self.board.unsigned_long_min:
+            err = "Value {} exceeds the size of the board's unsigned long.".format(value)
+            raise OverflowError(err)
+          
+        return struct.pack(self.board.unsigned_long_type,value)
+
+    def _send_float(self,value):
+        """
+        Return a float as a IEEE 754 format bytes object.
+        """
+
+        # convert to float. this will throw a ValueError if the type is not 
+        # readily converted
+        if type(value) != float:
+            value = float(value)
+
+        # Range check
+        if value > self.board.float_max or value < self.board.float_min:
+            err = "Value {} exceeds the size of the board's float.".format(value)
+            raise OverflowError(err)
+
+        return struct.pack(self.board.float_type,value)
+ 
+    def _send_double(self,value):
+        """
+        Return a float as a IEEE 754 format bytes object.
+        """
+
+        # convert to float. this will throw a ValueError if the type is not 
+        # readily converted
+        if type(value) != float:
+            value = float(value)
+
+        # Range check
+        if value > self.board.float_max or value < self.board.float_min:
+            err = "Value {} exceeds the size of the board's float.".format(value)
+            raise OverflowError(err)
+
+        return struct.pack(self.board.double_type,value)
+
+    def _send_string(self,value):
+        """
+        Convert a string to a bytes object.  If value is not a string, it is
+        be converted to one with a standard string.format call.  Finally, all
+        command and field separators are escaped with an escape character.
+        """
+
+        if type(value) != bytes:
+            value = "{}".format(value).encode("ascii")
+
+        # Escape command separator, field separator, escape, and nulls
+        value = self._escape_re.sub(self._byte_escape_sep + rb'\1',value)
+
+        return value
+
+    def _send_bool(self,value):
+        """
+        Convert a boolean value into a bytes object.  Uses 0 and 1 as output.
+        """
+
+        # Sanity check.
+        if type(value) != bool and value not in [0,1]:
+            err = "{} is not boolean.".format(value)
+            raise ValueError(err)
+
+        return struct.pack("?",value)
+
+    def _send_guess(self,value):
+        """
+        Send the argument as a string in a way that should (probably, maybe!) be
+        processed properly by C++ calls like atoi, atof, etc.  This method is
+        NOT RECOMMENDED, particularly for floats, because values are often 
+        mangled silently.  Instead, specify a format (e.g. "f") and use the 
+        CmdMessenger::readBinArg<CAST> method (e.g. c.readBinArg<float>();) to
+        read the values on the arduino side.
+        """
+
+        if type(value) != str and type(value) != bytes and self.give_warnings:
+            w = "Warning: Sending {} as a string. This can give wildly incorrect values. Consider specifying a format and sending binary data.".format(value)
+            warnings.warn(w,Warning)
+
+        if type(value) == float:
+            return "{:.10e}".format(value).encode("ascii")
+        elif type(value) == bool:
+            return "{}".format(int(value)).encode("ascii")
+        else:
+            return self._send_string(value)
+
+    def _recv_char(self,value):
+        """
+        Recieve a char in binary format, returning as string.
+        """
+
+        return struct.unpack("c",value)[0].decode("ascii")
+
+    def _recv_int(self,value):
+        """
+        Recieve an int in binary format, returning as python int.
+        """
+        return struct.unpack(self.board.int_type,value)[0]
+
+    def _recv_unsigned_int(self,value):
+        """
+        Recieve an unsigned int in binary format, returning as python int.
+        """
+
+        return struct.unpack(self.board.unsigned_int_type,value)[0]
+
+    def _recv_long(self,value):
+        """
+        Recieve a long in binary format, returning as python int.
+        """
+
+        return struct.unpack(self.board.long_type,value)[0]
+
+    def _recv_unsigned_long(self,value):
+        """
+        Recieve an unsigned long in binary format, returning as python int.
+        """
+
+        return struct.unpack(self.board.unsigned_long_type,value)[0]
+
+    def _recv_float(self,value):
+        """
+        Recieve a float in binary format, returning as python float.
+        """
+
+        return struct.unpack(self.board.float_type,value)[0]
+
+    def _recv_double(self,value):
+        """
+        Recieve a double in binary format, returning as python float.
+        """
+
+        return struct.unpack(self.board.float_type,value)[0]
+            
+    def _recv_string(self,value):
+        """
+        Recieve a binary (bytes) string, returning a python string.
+        """
+
+        s = value.decode('ascii')
+
+        # Strip null characters
+        s = s.strip("\x00")
+
+        # Strip other white space
+        s = s.strip()
+
+        return s
+
+    def _recv_bool(self,value):
+        """
+        Receive a binary bool, return as python bool.
+        """
+        
+        return struct.unpack("?",value)[0]
+
+    def _recv_guess(self,value):
+        """
+        Take the binary spew and try to make it into a float or integer.  If 
+        that can't be done, return a string.  
+
+        Note: this is generally a bad idea, as values can be seriously mangled
+        by going from float -> string -> float.  You'll generally be better off
+        using a format specifier and binary argument passing.
+        """
+
+        if self.give_warnings:
+            w = "Warning: Guessing input format for {}. This can give wildly incorrect values. Consider specifying a format and sending binary data.".format(value)
+            warnings.warn(w,Warning)
+
+        tmp_value = value.decode()
+
+        try:
+            float(tmp_value)
+
+            if len(tmp_value.split(".")) == 1:
+                # integer
+                return int(tmp_value)
+            else:
+                # float
+                return float(tmp_value)
+
+        except ValueError:
+            pass
+
+        # Return as string
+        return self._recv_string(value)
+
+
