@@ -2,8 +2,8 @@
 
 Python class for communication with an arduino using the
 [CmdMessenger](https://github.com/thijse/Arduino-CmdMessenger) serial
-communication library. It allows sending and recieving of messages with
-arguments, as well as a recieving via a listener on its own thread.
+communication library. It sends and recieves messages, automatically converting
+python data types to arduino types and vice versa.  
 
 This project is not affiliated with the CmdMessenger project, though it
 obviously builds off of their excellent work.
@@ -29,7 +29,7 @@ To test the library:
  * Compatibility: python 3.x, python 2.7
  * Should work on all platforms supported by pyserial.  
  * Tested on a Raspberry Pi (raspbian) and linux machine (Ununtu 15.10).  Have 
-not tested on Windows or OSX.
+not tested on Windows or OSX, but it should work fine.
 
 ### Dependencies
  * pyserial (on local machine): https://github.com/pyserial/pyserial
@@ -43,9 +43,7 @@ in the [test/arduino](https://github.com/harmsm/PyCmdMessenger/tree/master/test/
 [examples/arduino](https://github.com/harmsm/PyCmdMessenger/tree/master/examples/arduino)
 directories. 
 
-
 ##Example code
---------------
 
 A typical CmdMessenger message has the following structure:
 
@@ -60,6 +58,9 @@ To ensure stable communication with PyCmdMessenger:
 
  * PyCmdMessenger instances must be given a list of command names in the *same*
    order as those commands are specified in the arduino sketch.  
+ * PyCmdMessenger instances should be given a list of the data types for each 
+   command in the *same* order as those commands are specified in the arduino
+   sketch.
  * Separators must match between the PyCmdMessenger instance and the arduino
    sketch. 
    + field separator (default ",")
@@ -71,7 +72,7 @@ To ensure stable communication with PyCmdMessenger:
 A basic example is shown below.  These files are in the 
 [examples](https://github.com/harmsm/PyCmdMessenger/tree/master/examples) directory.
  
-###Arduino sketch
+###Arduino
 
 ```C
 
@@ -169,7 +170,7 @@ c = PyCmdMessenger.CmdMessenger(arduino,
 
 # Send
 c.send("who_are_you")
-# Receive. Should give ["my_name_is","Bob",TIME_RECIEVED]
+# Receive. Should give ["my_name_is",["Bob"],TIME_RECIEVED]
 msg = c.receive()
 print(msg)
 
@@ -177,49 +178,113 @@ print(msg)
 c.send("sum_two_ints",4,1)
 msg = c.receive()
 
-# should give ["sum_is",5,TIME_RECEIVED]
+# should give ["sum_is",[5],TIME_RECEIVED]
 print(msg)
 ```
 
-## Sending from python to arduino
-| name | arduino type  | Python Type              | Receive call                                         |
-|------|---------------|--------------------------|------------------------------------------------------|
-| "b"  | bool          | bool                     | bool value = c.readBinArg<bool>();                   |
-| "i"  | int           | int                      | int value = c.readBinArg<int>();                     |
-| "I"  | unsigned int  | int                      | unsigned int value = c.readBinArg<unsigned int>();   |
-| "l"  | long          | int                      | long value = c.readBinArg<long>();                   |
-| "L"  | unsigned long | int                      | unsigned long value = c.readBinArg<unsigned long>(); |
-| "f"  | float         | float                    | float value = c.readBinArg<float>();                 |
-| "d"  | double        | float                    | double value = c.readBinArg<double>();               |
-| "c"  | char          | str or bytes, length = 1 | char value = c.readBinArg<char>();                   |
-| "s"  | char[]        | str or bytes             | char *value = c.readStringArg();                     |
+##Format arguments
 
+The format for each argument sent with a command (or received with a command)
+is determined by the command_formats list passed to the CmdMessenger class (see
+example above). Alternatively, it can be specified by the keyword arg_formats
+passed directly to the `send` or `receive` methods.  The format specification
+is in the table below.  If a given command returns a single long value, the
+format string for that command would be `"l"`.  If it returns five longs, the
+format string would be `"lllll"`.  The types can be mixed and matched at will.
+`"sibbf"` would specify a command that send or receives five arguments that are
+a string, integer, bool, bool, and float.  If no argument is associated with a
+command, an empty string (`""`) or None can be used for the format.
 
-// Receive single value
-int value = c.readBinArg<int>();
+###Format reference table
 
-// Receive multiple values
-int value1 = c.readBinArg<int>();
-int value2 = c.readBinArg<int>();
+| format | arduino type  | Python Type              | Arduino receive                                       | Arduino send                        |
+|--------|---------------|--------------------------|-------------------------------------------------------|-------------------------------------|
+| "b"    | bool          | bool                     | `bool value = c.readBinArg<bool>();`                  | `c.sendBinCmd(COMMAND_NAME,value);` |
+| "i"    | int           | int                      | `int value = c.readBinArg<int>();`                    | `c.sendBinCmd(COMMAND_NAME,value);` |
+| "I"    | unsigned int  | int                      | `unsigned int value = c.readBinArg<unsigned int>();`  | `c.sendBinCmd(COMMAND_NAME,value);` |
+| "l"    | long          | int                      | `long value = c.readBinArg<long>();`                  | `c.sendBinCmd(COMMAND_NAME,value);` |
+| "L"    | unsigned long | int                      | `unsigned long value = c.readBinArg<unsigned long>();`| `c.sendBinCmd(COMMAND_NAME,value);` |
+| "f"    | float         | float                    | `float value = c.readBinArg<float>();`                | `c.sendBinCmd(COMMAND_NAME,value);` |
+| "d"    | double        | float                    | `double value = c.readBinArg<double>();`              | `c.sendBinCmd(COMMAND_NAME,value);` |
+| "c"    | char          | str or bytes, length = 1 | `char value = c.readBinArg<char>();`                  | `c.sendBinCmd(COMMAND_NAME,value);` |
+| "s"    | char[]        | str or bytes             | `char value[SIZE] = c.readStringArg();`               | `c.sendCmd(COMMAND_NAME,value);`    |
 
+PyCmdMessenger takes care of type conversion before anything is sent over the
+serial connection.  For example, if the user sends an integer as an "f"
+(float), PyCmdMessenger will run `float(value)` in python before passing it.
+It will warn the user for destructive conversions (say, a float to an
+integer).  It will throw a `ValueError` if the conversion cannot be done (e.g.
+the string 'ABC' to integer).  It will throw an `OverflowError` if the passed
+value cannot be accomodated in the specififed arduino data type (say, by
+passing an integer greater than 32767 to a 2-byte integer, or a negative number
+to an unsigned int).  The sizes for each arduino type are determined by the
+`XXX_bytes` attributes of the ArduinoBoard class.  
+
+With the exception of strings, all data are passed in binary format.  This both
+minimizes the number of bits sent and makes sure the sent values are accurate.  
+While you can *technically* send a float as a string to the arduino, then 
+convert it to a float via `atof`, this is extremely unreliable.  
+
+PyCmdMessenger will also automatically escape separators in strings, both on 
+sending and receiving.  For example, the default field separator is `,` an
+dthe default escape character is `/`.  If the user sends the string 
+`Hello, my name is Bob.`, PyCmdMessenger will convert this to 
+`Hello/, my name is Bob.`  CmdMessenger on the arduino will strip out the 
+escape character when received.  The same behavior should hold for recieving
+from the arduino.  
+
+##Testing
+
+The [tests](https://github.com/harmsm/PyCmdMessenger/tests/) directory has an
+arduino sketch that can be compiled and loaded onto an arudino, as well as a
+python test script, `pingpong_test.py`.  This will send a wide range of values
+for every data type back and forth to the arduino, reporting success and failure.
+The first phase of the testing passes values in binary and should work, giving
+no errors.  The second phase of the testing passes values as plain-text strings.
+It will likely fail horribly.  
+
+##Quick reference for CmdMessenger on arduino side
+For more details, see the [CmdMessenger](https://github.com/thijse/Arduino-CmdMessenger) project page.
+
+###Receiving
+```C
+/* For all types except strings (replace TYPE appropriately)*/
+int value = c.readBinArg<TYPE>();
+
+/* For strings */
+char string[BUFFER_SIZE] = c.readStringArg();
+
+```
+###Sending
+```C
+/* For all types except strings */
 // Send single value (COMMAND_NAME must be enumerated at top of sketch)
 c.sendBinCmd(COMMAND_NAME,value);
 
 // Send multiple values via a single command
 c.sendCmdStart(COMMAND_NAME);
-c.sendBinArg(value1);
-c.sendBinArg(value2);
+c.sendCmdBinArg(value1);
+c.sendCmdBinArg(value2);
+// ...
+// ...
 c.sendCmdEnd();
 
+/* For strings */
+// Send single string (COMMAND_NAME must be enumerated at top of sketch)
+c.sendCmd(COMMAND_NAME,string);
 
-##Python API reference
-----------------------
+// Send multiple strings via a single command
+c.sendCmdStart(COMMAND_NAME);
+c.sendCmdArg(string1);
+c.sendCmdArg(string2);
+// ...
+// ...
+c.sendCmdEnd();
+```
 
-###Module PyCmdMessenger
----------------------
+##Python Classes
 
-####Classes
--------
+```
 CmdMessenger 
     Basic interface for interfacing over a serial connection to an arduino 
     using the CmdMessenger library.
@@ -371,3 +436,4 @@ ArduinoBoard
     unsigned_long_max
 
     unsigned_long_min
+```

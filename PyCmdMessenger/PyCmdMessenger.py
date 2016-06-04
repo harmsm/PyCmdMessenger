@@ -156,9 +156,10 @@ class CmdMessenger:
                 # if not, guess for all arguments
                 arg_format_list = ["g" for i in range(len(args))]
 
-        if len(arg_format_list) != len(args):
-            err = "Number of argument formats must match the number of arguments."
-            raise ValueError(err)
+        if len(args) > 0:
+            if len(arg_format_list) != len(args):
+                err = "Number of argument formats must match the number of arguments."
+                raise ValueError(err)
 
         # Go through each argument and create a bytes representation in the
         # proper format to send.
@@ -277,9 +278,10 @@ class CmdMessenger:
                 # if not, guess for all arguments
                 arg_format_list = ["g" for i in range(len(fields[1:]))]
 
-        if len(arg_format_list) != len(fields[1:]):
-            err = "Number of argument formats must match the number of recieved arguments."
-            raise ValueError(err)
+        if len(fields[1:]) > 0:
+            if len(arg_format_list) != len(fields[1:]):
+                err = "Number of argument formats must match the number of recieved arguments."
+                raise ValueError(err)
 
         received = []
         for i, f in enumerate(fields[1:]):

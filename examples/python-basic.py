@@ -24,7 +24,7 @@ c = PyCmdMessenger.CmdMessenger(arduino,
 
 # Send
 c.send("who_are_you")
-# Receive. Should give ["my_name_is","Bob",TIME_RECIEVED]
+# Receive. Should give ["my_name_is",["Bob"],TIME_RECIEVED]
 msg = c.receive()
 print(msg)
 
@@ -32,5 +32,5 @@ print(msg)
 c.send("sum_two_ints",4,1)
 msg = c.receive()
 
-# should give ["sum_is",5,TIME_RECEIVED]
+# should give ["sum_is",[5],TIME_RECEIVED]
 print(msg)
