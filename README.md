@@ -85,7 +85,7 @@ A basic example is shown below.  These files are in the
 /* Define available CmdMessenger commands */
 enum {
     who_are_you,
-    my_nme_is,
+    my_name_is,
     sum_two_ints,
     sum_is,
     error,
@@ -212,43 +212,35 @@ c.sendBinArg(value2);
 c.sendCmdEnd();
 
 
-
-
 ##Python API reference
 ----------------------
 
-####Module PyCmdMessenger
+###Module PyCmdMessenger
 ---------------------
 
 ####Classes
 -------
-
-PyCmdMessenger 
+CmdMessenger 
     Basic interface for interfacing over a serial connection to an arduino 
     using the CmdMessenger library.
 
-    Ancestors (in MRO)
-    ------------------
-    PyCmdMessenger.PyCmdMessenger
-    builtins.object
-
     Static methods
     --------------
-    __init__(self, device, command_names, timeout=0.25, baud_rate=9600, field_separator=',', command_separator=';', escape_separator='/', convert_strings=True)
+    __init__(self, board_instance, command_names, command_formats=None, field_separator=',', command_separator=';', escape_separator='/', warnings=True)
         Input:
-        device:
-            device location (e.g. /dev/ttyACM0)
+        board_instance:
+            instance of ArduinoBoard initialized with correct serial 
+            connection (points to correct serial with correct baud rate) and
+            correct board parameters (float bytes, etc.)
 
         command_names:
             a list or tuple of the command names specified in the arduino
             .ino file *in the same order they are listed there.*  
 
-        timeout:
-            time to wait on a given serial request before giving up
-            (seconds).  Default: 0.25
-
-        baud_rate: 
-            serial baud rate. Default: 9600
+        command_formats:
+            a list or tuple of strings that specify the formats of the
+            commands in command names.  Optional but *highly* recommmended.
+            Default: None
 
         field_separator:
             character that separates fields within a message
@@ -262,56 +254,120 @@ PyCmdMessenger
             escape character to allow separators within messages.
             Default: "/"
 
-        convert_strings:
-            on receiving, try to intelligently convert parameters to
-            integers or floats. Default: True
+        warnings:
+            warnings for user
+            Default: True
 
-        The baud_rate, separators, and escape_separator should match what's
+        The separators and escape_separator should match what's
         in the arduino code that initializes the CmdMessenger.  The default
         separator values match the default values as of CmdMessenger 4.0.
 
-    listen(self, listen_delay=1)
-        Listen for incoming messages on its own thread, appending to recieving
-        queue.  
+    receive(self, arg_formats=None)
+        Recieve commands coming off the serial port. 
 
-        Input:
-            listen_delay: time to wait between checks (seconds)
+        arg_formats optional, but highly recommended if you do not initialize
+        the class instance with a command_formats argument.  The keyword  
+        specifies the formats to use to parse incoming arguments.  If specified
+        here, arg_formats supercedes command_formats specified on initialization.
 
-    receive(self)
-        Read a single serial message sent by CmdMessage library.
-
-    receive_all(self)
-        Get all messages from the arduino (both from listener and the complete
-        current serial buffer).
-
-    receive_from_listener(self, warn=True)
-        Return messages that have been grabbed by the listener.
-
-        Input:
-            warn: warn if the listener is not actually active.
-
-    send(self, *args)
+    send(self, cmd, *args)
         Send a command (which may or may not have associated arguments) to an 
         arduino using the CmdMessage protocol.  The command and any parameters
-        should be passed as direct arguments to send.  The function will convert
-        python data types to strings, as well as escaping all separator
-        characters in strings.
+        should be passed as direct arguments to send.  
 
-    stop_listening(self)
-        Stop an existing listening thread.
+        arg_formats optional, but highly recommended if you do not initialize
+        the class instance with a command_formats argument.  The keyword  
+        specifies the formats to use for each argument when passed to the
+        arduino. If specified here, arg_formats supercedes command_formats
+        specified on initialization.
 
     Instance variables
     ------------------
-    baud_rate
+    board
+
+    command_formats
 
     command_names
 
     command_separator
 
-    device
-
     escape_separator
 
     field_separator
 
+    give_warnings
+
+ArduinoBoard 
+    Class for connecting to an Arduino board over USB using PyCmdMessenger.  
+    The board holds the serial handle (which, in turn, holds the device name,
+    baud rate, and timeout) and the board parameters (size of data types in 
+    bytes, etc.).  The default parameters are for an ArduinoUno board.
+
+    Static methods
+    --------------
+    __init__(self, device, baud_rate=9600, timeout=1.0, settle_time=2.0, int_bytes=2, long_bytes=4, float_bytes=4, double_bytes=4)
+        Serial connection parameters:
+            
+            device: serial device (e.g. /dev/ttyACM0)
+            baud_rate: baud rate set in the compiled sketch
+            timeout: timeout for serial reading and writing
+            settle_time: how long to wait before trying to access serial port
+
+        Board input parameters:
+            int_bytes: number of bytes to store an integer
+            long_bytes: number of bytes to store a long
+            float_bytes: number of bytes to store a float
+            double_bytes: number of bytes to store a double
+
+        These can be looked up here:
+            https://www.arduino.cc/en/Reference/HomePage (under data types)
+
+        The default parameters work for ATMega328p boards.
+
+    close(self)
+        Close serial connection.
+
+    read(self)
+        Wrap serial read method.
+
+    readline(self)
+        Wrap serial readline method.
+
+    write(self, msg)
+        Wrap serial write method.
+
+    Instance variables
+    ------------------
+    baud_rate
+
+    comm
+
+    device
+
+    double_bytes
+
+    float_bytes
+
+    int_bytes
+
+    int_max
+
+    int_min
+
+    long_bytes
+
+    long_max
+
+    long_min
+
+    settle_time
+
     timeout
+
+    unsigned_int_max
+
+    unsigned_int_min
+
+    unsigned_long_max
+
+    unsigned_long_min

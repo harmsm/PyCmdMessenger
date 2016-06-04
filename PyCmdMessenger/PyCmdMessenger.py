@@ -39,7 +39,9 @@ class CmdMessenger:
                 .ino file *in the same order they are listed there.*  
 
             command_formats:
-                SOMETHING
+                a list or tuple of strings that specify the formats of the
+                commands in command names.  Optional but *highly* recommmended.
+                Default: None
 
             field_separator:
                 character that separates fields within a message
@@ -124,10 +126,11 @@ class CmdMessenger:
         arduino using the CmdMessage protocol.  The command and any parameters
         should be passed as direct arguments to send.  
 
-        arg_formats is an optional (but highly recommended!) keyword that 
+        arg_formats optional, but highly recommended if you do not initialize
+        the class instance with a command_formats argument.  The keyword  
         specifies the formats to use for each argument when passed to the
-        arduino. If specified here, arg_formats supercedes cmd_arg_formats
-        specified on a per-command basis when the class was initialized.  
+        arduino. If specified here, arg_formats supercedes command_formats
+        specified on initialization.  
         """
 
         # Turn the command into an integer.
@@ -177,10 +180,10 @@ class CmdMessenger:
         """
         Recieve commands coming off the serial port. 
 
-        arg_formats is an optional (but highly recommended!) string that 
-        specifies how to parse the incoming arguments.  If specified here,
-        arg_formats supercedes cmd_arg_formats specified on a per-command
-        basis when the class was initialized.  
+        arg_formats optional, but highly recommended if you do not initialize
+        the class instance with a command_formats argument.  The keyword  
+        specifies the formats to use to parse incoming arguments.  If specified
+        here, arg_formats supercedes command_formats specified on initialization.  
         """
 
         # Read serial input until a command separator or empty character is

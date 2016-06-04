@@ -32,7 +32,7 @@ class ArduinoBoard:
             device: serial device (e.g. /dev/ttyACM0)
             baud_rate: baud rate set in the compiled sketch
             timeout: timeout for serial reading and writing
-            settling_time: how long to wait before trying to access serial port
+            settle_time: how long to wait before trying to access serial port
 
         Board input parameters:
             int_bytes: number of bytes to store an integer
