@@ -191,7 +191,7 @@ passed directly to the `send` or `receive` methods.  The format specification
 is in the table below.  If a given command returns a single float value, the
 format string for that command would be `"f"`.  If it returns five floats, the
 format string would be `"fffff"`.  The types can be mixed and matched at will.
-`"sibbf"` would specify a command that send or receives five arguments that are
+`"sibbf"` would specify a command that sends or receives five arguments that are
 a string, integer, bool, bool, and float.  If no argument is associated with a
 command, an empty string (`""`) or `None` can be used for the format.
 
@@ -241,7 +241,9 @@ as a python test script, `pingpong_test.py`.  This will send a wide range of
 values for every data type back and forth to the arduino, reporting success and
 failure.  The first phase of the testing passes values in binary and should
 work, giving no errors.  The second phase of the testing passes values as
-plain-text strings. It will likely fail horribly.  
+plain-text strings. It will likely fail horribly.  PyCmdMessenger does not use
+that interface unless forced to because the user did not specify a format for
+the data being passed. 
 
 ##Quick reference for CmdMessenger on arduino side
 For more details, see the [CmdMessenger](https://github.com/thijse/Arduino-CmdMessenger) project page.
