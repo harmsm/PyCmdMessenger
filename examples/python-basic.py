@@ -3,29 +3,35 @@
 # ------------------------------------------------------------------------------
 
 import PyCmdMessenger
-import time
 
-# Initialize instance of class with appropriate device.  command_names must 
-# match names and order from arduino file.
-c = PyCmdMessenger.PyCmdMessenger("/dev/ttyACM0",
-                                  command_names=("who_are_you",
-                                                 "sum_two_ints",
-                                                 "result",
-                                                 "error"))
+# Initialize an ArduinoBoard instance.  This is where you specify baud rate and
+# serial timeout.  If you are using a non ATmega328 board, you might also need
+# to set the data sizes (bytes for integers, longs, floats, and doubles).  
+a = PyCmdMessenger.ArduinoBoard("/dev/ttyACM0",baud_rate=9600)
 
-# Give time for the device to connect
-time.sleep(2)
+# List of command_names in arduino file. These must be in the same order as in
+# the sketch.
+command_names = ["who_are_you","sum_two_ints","result","error"]
 
-# Send and receive
+# List of data types being sent/recieved for each command, again in the same 
+# order. 
+command_formats = ["","ii","i","s"]
+
+# Initialize the messenger
+c = PyCmdMessenger.CmdMessenger(arduino,
+                                command_names=command_names,
+                                command_formats=commmand_formats)
+
+# Send
 c.send("who_are_you")
-msg = c.receive()
 
-# should give [TIME_IN_S,"result","Bob"]
+# Receive. Should give ["result","Bob",TIME_RECIEVED]
+msg = c.receive()
 print(msg)
 
 # Send with multiple parameters
 c.send("sum_two_ints",4,1)
 msg = c.receive()
 
-# should give [TIME_IN_S,"result",4,1,5]
+# should give ["result",5,TIME_RECEIVED]
 print(msg)
