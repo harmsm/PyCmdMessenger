@@ -162,17 +162,14 @@ class CmdMessenger:
                 raise ValueError(err)
 
         # Go through each argument and create a bytes representation in the
-        # proper format to send.
+        # proper format to send.  Escape appropriate characters. 
         fields = ["{}".format(command_as_int).encode("ascii")]
         for i, a in enumerate(args):
             fields.append(self._send_methods[arg_format_list[i]](a))
+            fields[-1] = self._escape_re.sub(self._byte_escape_sep + rb'\1',fields[-1])
 
         # Make something that looks like cmd,field1,field2,field3;
         compiled_bytes = self._byte_field_sep.join(fields) + self._byte_command_sep
-
-        # Escape \0 characters in final compiled binary bytes
-        compiled_bytes = self._null_escape_re.sub(self._byte_escape_sep + b'\0',
-                                                  compiled_bytes)
 
         # Send the message.
         self.board.write(compiled_bytes)
@@ -443,15 +440,11 @@ class CmdMessenger:
     def _send_string(self,value):
         """
         Convert a string to a bytes object.  If value is not a string, it is
-        be converted to one with a standard string.format call.  Finally, all
-        command and field separators are escaped with an escape character.
+        be converted to one with a standard string.format call.  
         """
 
         if type(value) != bytes:
             value = "{}".format(value).encode("ascii")
-
-        # Escape command separator, field separator, escape, and nulls
-        value = self._escape_re.sub(self._byte_escape_sep + rb'\1',value)
 
         return value
 
@@ -534,7 +527,7 @@ class CmdMessenger:
         Recieve a double in binary format, returning as python float.
         """
 
-        return struct.unpack(self.board.float_type,value)[0]
+        return struct.unpack(self.board.double_type,value)[0]
             
     def _recv_string(self,value):
         """
