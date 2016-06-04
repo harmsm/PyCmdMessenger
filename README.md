@@ -188,12 +188,12 @@ The format for each argument sent with a command (or received with a command)
 is determined by the command_formats list passed to the CmdMessenger class (see
 example above). Alternatively, it can be specified by the keyword arg_formats
 passed directly to the `send` or `receive` methods.  The format specification
-is in the table below.  If a given command returns a single long value, the
-format string for that command would be `"l"`.  If it returns five longs, the
-format string would be `"lllll"`.  The types can be mixed and matched at will.
+is in the table below.  If a given command returns a single float value, the
+format string for that command would be `"f"`.  If it returns five floats, the
+format string would be `"fffff"`.  The types can be mixed and matched at will.
 `"sibbf"` would specify a command that send or receives five arguments that are
 a string, integer, bool, bool, and float.  If no argument is associated with a
-command, an empty string (`""`) or None can be used for the format.
+command, an empty string (`""`) or `None` can be used for the format.
 
 ###Format reference table
 
@@ -210,7 +210,7 @@ command, an empty string (`""`) or None can be used for the format.
 | "s"    | char[]        | str or bytes             | `char value[SIZE] = c.readStringArg();`               | `c.sendCmd(COMMAND_NAME,value);`    |
 
 PyCmdMessenger takes care of type conversion before anything is sent over the
-serial connection.  For example, if the user sends an integer as an "f"
+serial connection.  For example, if the user sends an integer as an `"f"`
 (float), PyCmdMessenger will run `float(value)` in python before passing it.
 It will warn the user for destructive conversions (say, a float to an
 integer).  It will throw a `ValueError` if the conversion cannot be done (e.g.
@@ -221,8 +221,8 @@ to an unsigned int).  The sizes for each arduino type are determined by the
 `XXX_bytes` attributes of the ArduinoBoard class.  
 
 With the exception of strings, all data are passed in binary format.  This both
-minimizes the number of bits sent and makes sure the sent values are accurate.  
-While you can *technically* send a float as a string to the arduino, then 
+minimizes the number of bits sent and makes sure the sent values are accurate. 
+While you can technically send a float as a string to the arduino, then 
 convert it to a float via `atof`, this is extremely unreliable.  
 
 PyCmdMessenger will also automatically escape separators in strings, both on 
@@ -235,30 +235,35 @@ from the arduino.
 
 ##Testing
 
-The [tests](https://github.com/harmsm/PyCmdMessenger/tests/) directory has an
-arduino sketch that can be compiled and loaded onto an arudino, as well as a
-python test script, `pingpong_test.py`.  This will send a wide range of values
-for every data type back and forth to the arduino, reporting success and failure.
-The first phase of the testing passes values in binary and should work, giving
-no errors.  The second phase of the testing passes values as plain-text strings.
-It will likely fail horribly.  
+The [test](https://github.com/harmsm/PyCmdMessenger/tree/master/test) directory
+has an arduino sketch that can be compiled and loaded onto an arudino, as well
+as a python test script, `pingpong_test.py`.  This will send a wide range of
+values for every data type back and forth to the arduino, reporting success and
+failure.  The first phase of the testing passes values in binary and should
+work, giving no errors.  The second phase of the testing passes values as
+plain-text strings. It will likely fail horribly.  
 
 ##Quick reference for CmdMessenger on arduino side
 For more details, see the [CmdMessenger](https://github.com/thijse/Arduino-CmdMessenger) project page.
 
 ###Receiving
 ```C
-/* For all types except strings (replace TYPE appropriately)*/
+/* c is an instance of CmdMessenger (see example sketch above) */
+/* ------- For all types except strings (replace TYPE appropriately) --------*/
 int value = c.readBinArg<TYPE>();
 
-/* For strings */
+/* ----- For strings (replace BUFFER_SIZE with maximum string length) ------ */
 char string[BUFFER_SIZE] = c.readStringArg();
 
 ```
 ###Sending
 ```C
-/* For all types except strings */
-// Send single value (COMMAND_NAME must be enumerated at top of sketch)
+/* COMMAND_NAME must be enumerated at the top of the sketch.  c is an instance
+ * of CmdMessenger (see example sketch above) */
+
+/* ------------------- For all types except strings ------------------------*/
+
+// Send single value
 c.sendBinCmd(COMMAND_NAME,value);
 
 // Send multiple values via a single command
@@ -269,8 +274,8 @@ c.sendCmdBinArg(value2);
 // ...
 c.sendCmdEnd();
 
-/* For strings */
-// Send single string (COMMAND_NAME must be enumerated at top of sketch)
+/* ------------------------- For strings ------------------------------------- */
+// Send single string 
 c.sendCmd(COMMAND_NAME,string);
 
 // Send multiple strings via a single command
