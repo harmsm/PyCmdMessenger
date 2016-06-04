@@ -250,9 +250,6 @@ class PingPong:
         self.command = command
         self.delay = delay
 
-        # Let system settle
-        time.sleep(1)
-
         # Check connection
         self.connection.send("kAreYouReady")
  
@@ -318,6 +315,10 @@ class PingPong:
                 v = "caught overflow"
                 success = True
 
+            except EOFError:
+                v = "mangled message"
+                success = False
+
             #except:
             #    v = "exception"
             #    success = False
@@ -375,8 +376,8 @@ def main(argv=None):
     print("******************************************************************")
 
     binary_trials = []
-    t = PingPong("multivalue",board,multi_test,command="kMultiValuePing")
-    binary_trials.extend(t.run_tests(send_arg_formats="ilf",receive_arg_formats="ilf"))
+    #t = PingPong("multivalue",board,multi_test,command="kMultiValuePing")
+    #binary_trials.extend(t.run_tests(send_arg_formats="ilf",receive_arg_formats="ilf"))
 
     t = PingPong("kBBool",board,bool_test)
     binary_trials.extend(t.run_tests(send_arg_formats="g?",receive_arg_formats="?"))

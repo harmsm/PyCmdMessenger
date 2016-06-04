@@ -1,254 +1,375 @@
-/* -----------------------------------------------------------------------------
- * Test .ino file to verify PyCmdMessenger functionality.  Should be compiled
- * with CmdMessenger.h and CmdMessenger.cpp in the sketch directory, then 
- * loaded onto the arduino prior to running run_test.py from the 
- * PyCmdMessenger/test/run_tests.py script.
- *----------------------------------------------------------------------------*/
+// *** CommandMessengerTest ***
+// This project runs unit tests on several parts on the mayor parts of the CmdMessenger library
+// Note that the primary function is not to serve as an example, so the code may be less documented 
+// and clean than the example projects. 
 
-#include "CmdMessenger.h"
-#include <stdlib.h>
+#include "CmdMessenger.h"  // CmdMessenger
 
-// ---------------------------------------------------------------------------------------
-// direct lift from here
-// https://arduino.stackexchange.com/questions/3079/how-to-retrieve-the-data-type-of-a-variable
+char field_separator   = ',';
+char command_separator = ';';
+char escape_separator  = '/';
 
-// Generic catch-all implementation.
-template <typename T_ty> struct TypeInfo { static const char * name; };
-template <typename T_ty> const char * TypeInfo<T_ty>::name = "unknown";
+// Blinking led variables 
+unsigned long previousToggleLed = 0;   // Last time the led was toggled
+bool ledState                   = 0;   // Current state of Led
+const int kBlinkLed             = 13;  // Pin of internal Led
 
-// Handy macro to make querying stuff easier.
-#define TYPE_NAME(var) TypeInfo< typeof(var) >::name
+int seriesLength;
+int seriesLengthCount;
 
-// Handy macro to make defining stuff easier.
-#define MAKE_TYPE_INFO(type)  template <> const char * TypeInfo<type>::name = #type;
-
-// Type-specific implementations.
-MAKE_TYPE_INFO( int )
-MAKE_TYPE_INFO( float )
-MAKE_TYPE_INFO( double )
-MAKE_TYPE_INFO( short )
-// ------------------------------------ ---------------------------------------------------
-
-#define HACK_BUFFER_SIZE 128
-
-void dbl_to_sci(char *out_string, double number, int num_decimal_places){
-
-    /* Generate a string representing a double in scientific notation with
-     * num_decimal_places digits after the decmial place.  
-     *
-     * Arguments:
-     *     out_string is a char buffer that will hold the string. 
-     *     number is the number to be processed.
-     *     num_decimal_places is the number of decimal places to show.
-     *
-     * Basic function form was derived from discussion here:
-     *     http://forum.arduino.cc/index.php?topic=166041.msg1241170#msg1241170
-     */ 
-
-    int maximum_indiv_message_size = HACK_BUFFER_SIZE;
+// Attach a new CmdMessenger object to the default Serial port
+CmdMessenger cmdMessenger = CmdMessenger(Serial, field_separator, command_separator);
 
 
-    /* The pieces we're going to build */
-    char sign, exponent_sign;
-    unsigned long before_decimal, after_decimal, exponent;
+// ------------------ C M D  L I S T I N G ( T X / R X ) ---------------------
 
-    /* Deal with NaN */ 
-    if (isnan(number)) {
-        sprintf(out_string,"nan");
-        return;
-    }
+// We can define up to a default of 50 cmds total, including both directions (send + receive)
+// and including also the first 4 default command codes for the generic error handling.
+// If you run out of message slots, then just increase the value of MAXCALLBACKS in CmdMessenger.h
 
-    /* Deal with infinity */
-    if (isinf(number)) { 
+ // This is the list of recognized commands. These can be commands that can either be sent or received. 
+ // In order to receive, attach a callback function to these events
+ // 
+ // Note that commands work both directions:
+ // - All commands can be sent
+ // - Commands that have callbacks attached can be received
+ // 
+ // This means that both sides should have an identical command list:
+ // both sides can either send it or receive it (or even both)    
+enum
+{
+  // General commands
+  kCommError                , // Command reports serial port comm error (only works for some comm errors)
+  kComment                  , // Command to sent comment in argument
+  
+  // Setup connection test
+  kAcknowledge              , // Command to acknowledge that cmd was received
+  kAreYouReady              , // Command to ask if other side is ready
+  kError                    , // Command to report errors
+  
+  // Acknowledge test
+  kAskUsIfReady             , // Command to ask other side to ask if ready 
+  kYouAreReady              , // Command to acknowledge that other is ready
+  
+  // Clear & Binary text data test
+  kValuePing                , // Command to send value to other side
+  kValuePong                , // Command to return value received with pong
+  
+  // Multiple Arguments test
+  kMultiValuePing           , // Command to send value to other side
+  kMultiValuePong           , // Command to return value received with pong
+  
+  // Benchmarks
+  kRequestReset             , // Command Request reset
+  kRequestResetAcknowledge  , // Command to acknowledge reset
 
-        if (number < 0) {
-            sign = '-';
-        } else { 
-            sign = ' ';
-        }
-
-        sprintf(out_string,"%s%s",sign,"inf");
-        return;
+  kRequestSeries            , // Command Request to send series in plain text
+  kReceiveSeries            , // Command to send an item in plain text
+  kDoneReceiveSeries,
         
-    }
-  
-    /* Figure out what to do with the sign */
-    sign = ' ';
-    if (number < 0.0) {
-        sign = '-';
-        number = -number;
-    }
-
-    /* --- At this point, the number should be a positive float --- */
-  
-    /* Discover the proper exponent */
-
-    /* Large number */
-    exponent = 0;
-    while (number >= 10.0) {
-        number /= 10.0;
-        exponent++;
-    }
-
-    /* Small number */
-    if (number != 0) {
-        while (number < 1.0) {
-            number *= 10.0;
-            exponent--;
-        }
-    }
-    
-    /* Decide on exponent sign */ 
-    if (exponent >= 0) {
-        exponent_sign = '+';
-    } else { 
-        exponent_sign = '-';
-        exponent = -1*exponent;
-    }
-    
-    /* --- At this point, the number is a positive float between 1 and 10 --- */
-
-    /* Add an offset so this will round to the correct number of digits when we 
-     * grab num_decimal_places off the end. */
-    double rounding = 0.5;
-    for (int i = 0; i < num_decimal_places; ++i) {
-        rounding /= 10.0;
-    }
-    number += rounding;
-
-    /* Extract the part of the number before the decimal */
-    before_decimal = (unsigned long)number;
-
-    /* Turn the part of the number after the decimal into a num_decimal_places
-     * long integer */
-    double remainder = number - (double)before_decimal;
-    for (int i = 0; i < num_decimal_places; i++){
-        remainder *= 10;
-    }    
-    after_decimal = (unsigned long)remainder;
-
-    /* Create the formatted output string, only printing decimal point if 
-       there are digits there to show. */
-    if (num_decimal_places > 0) { 
-        vsnprintf(out_string,"%c%i.%iE%c%i",sign,before_decimal,after_decimal,exponent_sign,exponent);
-    } else {
-        vsnprintf(out_string,   "%c%iE%c%i",sign,before_decimal,              exponent_sign,exponent);
-    }
-
-}
-
-
-const int BAUD_RATE = 9600;
-CmdMessenger c = CmdMessenger(Serial,',',';','/');
-
-/* Define available CmdMessenger commands */
-enum {
-    send_string,
-    send_float,
-    send_int,
-    send_two_int,
-    receive_string,
-    receive_float,
-    receive_int,
-    receive_two_int,
-    result,
-    error,
+  kPrepareSendSeries        , // Command to tell other side to prepare for receiving a series of text float commands
+  kSendSeries               , // Command to send a series of text float commands
+  kAckSendSeries            , // Command to acknowledge the send series of text float commands
 };
 
-void on_unknown_command(void){
-    c.sendCmd(error,"Command without callback.");
+// Needed for ping-pong function
+enum
+{
+  kBool,
+  kInt16,
+  kInt32,
+  kFloat,
+  kFloatSci,
+  kDouble,
+  kDoubleSci,
+  kChar,
+  kString,
+  kBBool,
+  kBInt16,
+  kBInt32,
+  kBFloat,
+  kBDouble,
+  kBChar,
+  kEscString,
+};
+
+
+
+// ------------------  C A L L B A C K S -----------------------
+
+void OnArduinoReady()
+{
+  // In response to ping. We just send a throw-away Acknowledgment to say "i'm ready"
+  cmdMessenger.sendCmd(kAcknowledge,"Arduino ready");
 }
 
-void on_send_string(void){
-    c.sendCmd(result,"A string with /, and /; escape");
+void OnUnknownCommand()
+{
+  // Default response for unknown commands and corrupt messages
+  cmdMessenger.sendCmd(kError,"Unknown command");
+  cmdMessenger.sendCmdStart(kYouAreReady);  
+  cmdMessenger.sendCmdArg("Command without attached callback");    
+  cmdMessenger.sendCmdArg(cmdMessenger.commandID());    
+  cmdMessenger.sendCmdEnd();
 }
 
-void on_send_float(void){
-    c.sendCmd(result,99.9);
+void OnAskUsIfReady()
+{
+  // The other side asks us to send kAreYouReady command, wait for
+  //acknowledge
+   int isAck = cmdMessenger.sendCmd(kAreYouReady, "Asking PC if ready", true, kAcknowledge,1000 );
+  // Now we send back whether or not we got an acknowledgments  
+  cmdMessenger.sendCmd(kYouAreReady,isAck?1:0);
 }
 
-void on_send_int(void){
-    c.sendCmd(result,-10);
+void OnValuePing()
+{
+  int dataType = cmdMessenger.readInt16Arg(); 
+   switch (dataType) 
+   {
+      // Plain text
+      case kBool:
+      {
+        bool value = cmdMessenger.readBoolArg();
+       cmdMessenger.sendCmd(kValuePong, value);
+        break;
+      }
+      case kInt16:
+      {
+        int value = cmdMessenger.readInt16Arg();
+        cmdMessenger.sendCmd(kValuePong, value);
+        break;
+      }
+      case kInt32:    
+      {  
+        long value = cmdMessenger.readInt32Arg();
+        cmdMessenger.sendCmd(kValuePong, value);
+        break;
+      }
+      case kFloat:
+      {
+         float value = cmdMessenger.readFloatArg();
+         cmdMessenger.sendCmd(kValuePong, value);
+         break;
+      }
+      case kDouble:
+      {
+         double value = cmdMessenger.readDoubleArg();
+         cmdMessenger.sendCmd(kValuePong, value);
+         break;
+      }
+      case kChar:    
+      {  
+        char value = cmdMessenger.readCharArg();
+        cmdMessenger.sendCmd(kValuePong, value);
+        break;
+      }
+      case kString:   
+      {   
+        char * value = cmdMessenger.readStringArg();
+        cmdMessenger.sendCmd(kValuePong, value);
+        break;
+      }
+      // Binary values
+      case kBBool:
+      {
+         bool value = cmdMessenger.readBinArg<bool>();
+         cmdMessenger.sendBinCmd(kValuePong, value);
+         break;
+      }
+      case kBInt16:
+      {
+         int16_t value = cmdMessenger.readBinArg<int16_t>();
+         cmdMessenger.sendBinCmd(kValuePong, value);
+         break;
+      }
+      case kBInt32:
+      {
+         int32_t value = cmdMessenger.readBinArg<int32_t>();
+         cmdMessenger.sendBinCmd(kValuePong, value);
+         break;
+      }
+      case kBFloat:
+      {
+         float value = cmdMessenger.readBinArg<float>();
+         cmdMessenger.sendBinCmd(kValuePong, value);
+         break;
+      }
+      case kFloatSci:
+      {
+        float value = cmdMessenger.readFloatArg();
+        cmdMessenger.sendCmdStart(kValuePong);
+        cmdMessenger.sendCmdSciArg(value,10);
+        cmdMessenger.sendCmdEnd();
+         break;
+      }
+      case kBDouble:
+      {
+         double value = cmdMessenger.readBinArg<double>();
+         cmdMessenger.sendBinCmd(kValuePong, value);
+         break;
+      }
+      case kDoubleSci:
+      {
+        double value = cmdMessenger.readDoubleArg();
+        cmdMessenger.sendCmdStart(kValuePong);
+        cmdMessenger.sendCmdSciArg(value,10);
+        cmdMessenger.sendCmdEnd();
+       break;
+      }
+      case kBChar:    
+      {  
+         char value = cmdMessenger.readBinArg<char>();
+         cmdMessenger.sendBinCmd(kValuePong, value);
+         break;
+      }
+      case kEscString:   
+      {   
+        char * value = cmdMessenger.readStringArg();
+        cmdMessenger.unescape(value);
+        cmdMessenger.sendCmdStart(kValuePong);
+        cmdMessenger.sendCmdEscArg(value);
+        cmdMessenger.sendCmdEnd();
+        break;
+      }
+      default: 
+        cmdMessenger.sendCmd(kError,"Unsupported type for valuePing!");  
+        break;
+   }   
 }
 
-void on_send_two_int(void){
-
-    int i;
-
-    c.sendCmdStart(result);
-    c.sendCmdArg(-10);
-    c.sendCmdArg(10);
-    c.sendCmdEnd();
-
+void OnMultiValuePing()
+{  
+   int16_t valueInt16 = cmdMessenger.readBinArg<int16_t>();  
+   int32_t valueInt32 = cmdMessenger.readBinArg<int32_t>();  
+   double valueDouble = cmdMessenger.readBinArg<double>();
+   
+   cmdMessenger.sendCmdStart(kMultiValuePong);
+   cmdMessenger.sendCmdBinArg(valueInt16);
+   cmdMessenger.sendCmdBinArg(valueInt32);
+   cmdMessenger.sendCmdBinArg(valueDouble);
+   cmdMessenger.sendCmdEnd();
 }
 
-void on_receive_string(void){
-    char * value = c.readStringArg();
-    c.sendCmd(result,"got it!");
+//--------------- Benchmarks ----------------------
+
+void OnRequestReset()
+{
+    seriesLengthCount = 0;
+     cmdMessenger.sendCmd(kRequestResetAcknowledge,"");
+}
+// Callback function calculates the sum of the two received float values
+void OnRequestSeries()
+{
+  // Get series length from 1st parameter
+  int seriesLength = cmdMessenger.readInt16Arg();
+  float seriesBase = cmdMessenger.readFloatArg();
+ 
+  // Send back series of floats
+  for(int i=0;i< seriesLength;i++) {
+     cmdMessenger.sendCmdStart (kReceiveSeries);
+     cmdMessenger.sendCmdArg<float>(((float)i*(float)seriesBase),6);
+     cmdMessenger.sendCmdEnd ();
+  }
+  cmdMessenger.sendCmd(kDoneReceiveSeries,"");
 }
 
-void on_receive_float(void){
-
-    float value = c.readFloatArg();
-
-    char junk[HACK_BUFFER_SIZE];
-    float_to_sci(junk, value, 10);
-
-    if (TYPE_NAME(value) == "float"){
-        //c.sendCmd(result,10*value);
-    }
-
-    //sprintf(junk,"%s %s","abc","def");
-    c.sendCmd(result,junk);
-
-
-    //c.sendCmd(result,TYPE_NAME(value) );
-         
-    //c.sendCmd(result,value*10.0);
-
+void OnPrepareSendSeries()
+{
+  seriesLength      = cmdMessenger.readInt16Arg();
+  seriesLengthCount = 0;
 }
 
-void on_receive_int(void){
-    int value = c.readInt16Arg();
-    c.sendCmd(result,value*10);
+void OnSendSeries()
+{
+  seriesLengthCount++;
+  //float seriesBase = cmdMessenger.readFloatArg();
+  if (seriesLengthCount == seriesLength) {
+    cmdMessenger.sendCmd(kAckSendSeries,"");
+  }
 }
 
-void on_receive_two_int(void){
 
-    int value1 = c.readInt16Arg();
-    int value2 = c.readInt16Arg();
+void attachCommandCallbacks()
+{
+  // Attach callback methods
+  //cmdMessenger.attach(OnUnknownCommand);
+  cmdMessenger.attach(kAreYouReady, OnArduinoReady);
+  cmdMessenger.attach(kAskUsIfReady, OnAskUsIfReady);
 
-    c.sendCmdStart(result);
-    c.sendCmdArg(10*value1);
-    c.sendCmdArg(10*value2);
-    c.sendCmdEnd();
-
-}
-
-/* Define callbacks for CmdMessenger commands */
-void attach_callbacks(void) { 
+  // Clear & Binary text data test
+  cmdMessenger.attach(kValuePing, OnValuePing);
+  cmdMessenger.attach(kMultiValuePing, OnMultiValuePing);
   
-    // Attach callback methods
-    c.attach(on_unknown_command);
+  // Benchmarks
+  cmdMessenger.attach(OnUnknownCommand);
+  cmdMessenger.attach(kRequestReset,      OnRequestReset);
+  cmdMessenger.attach(kRequestSeries,     OnRequestSeries);
 
-    c.attach(send_string,on_send_string);
-    c.attach(send_float,on_send_float);
-    c.attach(send_int,on_send_int);
-    c.attach(send_two_int,on_send_two_int);
-
-    c.attach(receive_string,on_receive_string);
-    c.attach(receive_float,on_receive_float);
-    c.attach(receive_int,on_receive_int);
-    c.attach(receive_two_int,on_receive_two_int);
-
+  cmdMessenger.attach(kPrepareSendSeries, OnPrepareSendSeries);
+  cmdMessenger.attach(kSendSeries,        OnSendSeries);
 }
 
-void setup() {
-    Serial.begin(BAUD_RATE);
-    c.printLfCr();  // <-- This is critical, as python library assumes newlines
-    attach_callbacks();    
+// ------------------ M A I N ( ) ----------------------
+
+// Toggle led state
+void toggleLed()
+{  
+  ledState = !ledState;
+  digitalWrite(kBlinkLed, ledState?HIGH:LOW);
+}  
+
+
+void setup() 
+{
+  // Listen on serial connection for messages from the pc
+  
+  // 115200 is the max speed on Arduino Uno, Mega, with AT8u2 USB
+  // SERIAL_8N1 is the default config, but we want to make certain
+  // that we have 8 bits to our disposal
+  Serial.begin(115200); 
+
+  // Maximum speed of some boards: Arduino Duemilanove, FTDI Serial
+  //Serial.begin(57600);  
+
+  // Many bluetooth breakout boards run on 9600 at default speed
+  // The Serial setting below should match this
+   //Serial.begin(9600); 
+
+  // Makes output more readable whilst debugging in Arduino Serial Monitor, 
+  // but uses more bytes 
+  //cmdMessenger.printLfCr();   
+
+  // Attach my application's user-defined callback methods
+  attachCommandCallbacks();
+
+  // Set command to PC to say we're ready
+  //OnArduinoReady();
+  
+  cmdMessenger.sendCmd(kAcknowledge,"Arduino has resetted!");
+
+  // set pin for blink LED
+  pinMode(kBlinkLed, OUTPUT);
 }
 
-void loop() {
-    c.feedinSerialData();
+bool hasExpired(unsigned long &prevTime, unsigned long interval) {
+  if (  millis() - prevTime > interval ) {
+    prevTime = millis();
+    return true;
+  } else     
+    return false;
 }
+
+void loop() 
+{
+  // Process incoming serial data, and perform callbacks
+  cmdMessenger.feedinSerialData();
+
+  // toggle LED. If the LED does not toggle every timeoutInterval, 
+  // this means the callbacks my the Messenger are taking a longer time than that  
+  if (hasExpired(previousToggleLed,2000)) // Every 2 secs
+  {
+    toggleLed();  
+  } 
+}
+

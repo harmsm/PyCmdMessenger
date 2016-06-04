@@ -67,7 +67,15 @@ class CmdMessenger:
         self.command_names = command_names[:]
         self._cmd_name_to_int = dict([(n,i) for i,n in enumerate(self.command_names)])
 
+        self.command_formats = command_formats
         self._cmd_name_to_format = {}
+        if self.command_formats != None:
+            if len(self.command_formats) != len(self.command_names):
+                err = "You must specify the same number of command formats and command names."
+                raise ValueError(err)
+
+            for i in range(len(self.command_names)):
+                self._cmd_name_to_format[self.command_names[i]] = self.command_formats[i]
 
         self.field_separator = field_separator
         self.command_separator = command_separator
@@ -220,7 +228,7 @@ class CmdMessenger:
                 # okay, must be something
                 else:
                     msg[-1].append(tmp)
-   
+  
         # No message received given timeouts
         if len(msg) == 1 and len(msg[0]) == 0:
             return None
@@ -232,7 +240,7 @@ class CmdMessenger:
             joined_raw = b''.join(raw_msg) 
             if joined_raw.strip() == b'':
                 return  None
-            
+           
             err = "Incomplete message ({})".format(joined_raw.decode())
             raise EOFError(err)
 

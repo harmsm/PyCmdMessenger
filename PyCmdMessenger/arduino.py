@@ -6,7 +6,7 @@ via USB.
 __author__ = "Michael J. Harms"
 __date__ = "2016-05-30"
 
-import serial
+import serial, time
 
 class ArduinoBoard:
     """
@@ -20,6 +20,7 @@ class ArduinoBoard:
                  device,
                  baud_rate=9600,
                  timeout=1.0,
+                 settle_time=2.0,
                  int_bytes=2,
                  long_bytes=4,
                  float_bytes=4,
@@ -31,6 +32,7 @@ class ArduinoBoard:
             device: serial device (e.g. /dev/ttyACM0)
             baud_rate: baud rate set in the compiled sketch
             timeout: timeout for serial reading and writing
+            settling_time: how long to wait before trying to access serial port
 
         Board input parameters:
             int_bytes: number of bytes to store an integer
@@ -47,6 +49,7 @@ class ArduinoBoard:
         self.device = device
         self.baud_rate = baud_rate
         self.timeout = timeout
+        self.settle_time = settle_time
 
         self.int_bytes = int_bytes
         self.long_bytes = long_bytes
@@ -58,6 +61,8 @@ class ArduinoBoard:
         self.comm = serial.Serial(self.device,
                                   self.baud_rate,
                                   timeout=self.timeout)
+
+        time.sleep(self.settle_time)
 
         #----------------------------------------------------------------------
         # Figure out proper type limits given the board specifications
