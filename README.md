@@ -13,7 +13,7 @@ obviously builds off of their excellent work.
     + `git clone https://github.com/harmsm/PyCmdMessenger.git` 
     + `cd PyCmdMessenger`
     + `sudo python3 setup.py install`
- * From pipi:
+ * From PyPI:
     + `sudo pip3 install PyCmdMessenger`
 
 For python 2.7, replace `python3` with `python` and `pip3` with `pip`.
