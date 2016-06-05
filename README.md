@@ -20,10 +20,10 @@ For python 2.7, replace `python3` with `python` and `pip3` with `pip`.
 
 To test the library:
  * Clone the source from git
- * Compile the arduino sketch in the `test` directory
+ * Compile the arduino sketch in the `pingpong_arduino` directory
  * Transfer the compiled sketch to an arduino plugged into the computer
- * Run the `test/run_test.py` script.  This will pass a variety of data types
-   between the local computer and the arduino.
+ * Run the `test/pingpong_test.py` script.  This will pass a variety of data
+   types between the local computer and the arduino.  
 
 ### Compatibility
  * Compatibility: python 3.x, python 2.7
@@ -191,7 +191,7 @@ passed directly to the `send` or `receive` methods.  The format specification
 is in the table below.  If a given command returns a single float value, the
 format string for that command would be `"f"`.  If it returns five floats, the
 format string would be `"fffff"`.  The types can be mixed and matched at will.
-`"sibbf"` would specify a command that sends or receives five arguments that are
+`"si??f"` would specify a command that sends or receives five arguments that are
 a string, integer, bool, bool, and float.  If no argument is associated with a
 command, an empty string (`""`) or `None` can be used for the format.
 
@@ -199,13 +199,13 @@ command, an empty string (`""`) or `None` can be used for the format.
 
 | format | arduino type  | Python Type              | Arduino receive                                       | Arduino send                        |
 |--------|---------------|--------------------------|-------------------------------------------------------|-------------------------------------|
-| "b"    | bool          | bool                     | `bool value = c.readBinArg<bool>();`                  | `c.sendBinCmd(COMMAND_NAME,value);` |
 | "i"    | int           | int                      | `int value = c.readBinArg<int>();`                    | `c.sendBinCmd(COMMAND_NAME,value);` |
 | "I"    | unsigned int  | int                      | `unsigned int value = c.readBinArg<unsigned int>();`  | `c.sendBinCmd(COMMAND_NAME,value);` |
 | "l"    | long          | int                      | `long value = c.readBinArg<long>();`                  | `c.sendBinCmd(COMMAND_NAME,value);` |
 | "L"    | unsigned long | int                      | `unsigned long value = c.readBinArg<unsigned long>();`| `c.sendBinCmd(COMMAND_NAME,value);` |
 | "f"    | float         | float                    | `float value = c.readBinArg<float>();`                | `c.sendBinCmd(COMMAND_NAME,value);` |
 | "d"    | double        | float                    | `double value = c.readBinArg<double>();`              | `c.sendBinCmd(COMMAND_NAME,value);` |
+| "?"    | bool          | bool                     | `bool value = c.readBinArg<bool>();`                  | `c.sendBinCmd(COMMAND_NAME,value);` |
 | "c"    | char          | str or bytes, length = 1 | `char value = c.readBinArg<char>();`                  | `c.sendBinCmd(COMMAND_NAME,value);` |
 | "s"    | char[]        | str or bytes             | `char value[SIZE] = c.readStringArg();`               | `c.sendCmd(COMMAND_NAME,value);`    |
 
@@ -222,8 +222,8 @@ to an unsigned int).  The sizes for each arduino type are determined by the
 
 With the exception of strings, all data are passed in binary format.  This both
 minimizes the number of bits sent and makes sure the sent values are accurate. 
-While you can technically send a float as a string to the arduino, then 
-convert it to a float via `atof`, this is extremely unreliable.  
+(While you can technically send a float as a string to the arduino, then 
+convert it to a float via `atof`, this is extremely unreliable.) 
 
 PyCmdMessenger will also automatically escape separators in strings, both on 
 sending and receiving.  For example, the default field separator is `,` an
@@ -236,14 +236,10 @@ from the arduino.
 ##Testing
 
 The [test](https://github.com/harmsm/PyCmdMessenger/tree/master/test) directory
-has an arduino sketch that can be compiled and loaded onto an arudino, as well
-as a python test script, `pingpong_test.py`.  This will send a wide range of
-values for every data type back and forth to the arduino, reporting success and
-failure.  The first phase of the testing passes values in binary and should
-work, giving no errors.  The second phase of the testing passes values as
-plain-text strings. It will likely fail horribly.  PyCmdMessenger does not use
-that interface unless forced to because the user did not specify a format for
-the data being passed. 
+has an arduino sketch (in `pingpong_arduino`) that can be compiled and loaded
+onto an arudino, as well as a python test script, `pingpong_test.py`.  This will
+send a wide range of values for every data type back and forth to the arduino,
+reporting success and failure.  
 
 ##Quick reference for CmdMessenger on arduino side
 For more details, see the [CmdMessenger](https://github.com/thijse/Arduino-CmdMessenger) project page.
