@@ -33,9 +33,7 @@ void on_sum_two_ints(void){
     int value2 = c.readBinArg<int>();
 
     /* Send result back */ 
-    c.sendCmdStart(sum_is);
-    c.sendCmdBinArg(value1 + value2);
-    c.sendCmdEnd();
+    c.sendCmdBin(sum_is,value1 + value2);
 
 }
 
