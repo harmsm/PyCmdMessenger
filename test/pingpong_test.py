@@ -5,7 +5,7 @@ Run full test suite on PyCmdMessenger/arduino interface.
 """
 __description__ = "Michael J. Harms"
 __date__ = "2016-05-30"
-__usage__ = "run_test.py serial_device"
+__usage__ = "run_test.py serial_device [s] (optional s will test string interface)"
 
 import PyCmdMessenger
 import time, string, sys, struct, random
@@ -107,7 +107,7 @@ class FloatTest(Test):
         self.test_set = [0]
         self.test_set.extend([(10.0)**e for e in range(-40,41,2)])
         self.test_set.extend([-(10.0)**e for e in range(-40,41,2)])
-        self.test_set.extend([random.random() for i in range(10)])
+        self.test_set.extend([random.random() for i in range(50)])
         self.test_set.sort()
         
 
@@ -359,6 +359,19 @@ def main(argv=None):
         err = "Incorrect arguments. Usage: \n\n{}\n\n".format(__usage__)
         raise IndexError(err)
 
+    run_string_tests = False
+    try:
+        if argv[1] == "s":
+            run_string_tests = True
+        else:
+            err = "flag {} not recognized. Usage: \n\n{}\n\n".format(argv[1],
+                                                                     __usage__)
+            raise ValueError(err)
+    except IndexError:
+        pass
+
+    
+
     # Create an arduino board instance with a serial connection
     board = PyCmdMessenger.ArduinoBoard(serial_device,baud_rate=BAUD_RATE,timeout=0.1)
 
@@ -372,13 +385,10 @@ def main(argv=None):
     multi_test = MultiTest()
 
     print("******************************************************************")
-    print("*    Test using binary interface (should have 100% success)      *")
+    print("*  Test passing values to and from arduino with PyCmdMessenger   *")
     print("******************************************************************")
 
     binary_trials = []
-    #t = PingPong("multivalue",board,multi_test,command="kMultiValuePing")
-    #binary_trials.extend(t.run_tests(send_arg_formats="ilf",receive_arg_formats="ilf"))
-
     t = PingPong("kBBool",board,bool_test)
     binary_trials.extend(t.run_tests(send_arg_formats="g?",receive_arg_formats="?"))
 
@@ -403,11 +413,21 @@ def main(argv=None):
     t = PingPong("kEscString",board,string_test)
     binary_trials.extend(t.run_tests(send_arg_formats="gs",receive_arg_formats="s"))
 
+    t = PingPong("multivalue",board,multi_test,command="kMultiValuePing")
+    binary_trials.extend(t.run_tests(send_arg_formats="ilf",receive_arg_formats="ilf"))
 
-    
-    print("SUMMARY: Passed {} of {} binary interface binary_trials".format(sum(binary_trials),
-                                                                    len(binary_trials)))
+    print("******************************************************************")
+    print("*                   FINAL SUMMARY                                *")
+    print("******************************************************************")
     print()
+    print("SUMMARY: Passed {} of {} binary interface tests".format(sum(binary_trials),
+                                                                   len(binary_trials)))
+    if sum(binary_trials) != len(binary_trials):
+        print("WARNING: some tests failed!")
+    print()
+
+    if not run_string_tests:
+        return
 
     print("******************************************************************")
     print("*     Test using string interface (will fail a lot)              *")
@@ -445,22 +465,19 @@ def main(argv=None):
     t = PingPong("kEscString",board,string_test)
     string_trials.extend(t.run_tests())
     
-    print("SUMMARY: Passed {} of {} string interface string_trials".format(sum(string_trials),
-                                                                    len(string_trials)))
-    print()
-
     print("******************************************************************")
     print("*                   FINAL SUMMARY                                *")
     print("******************************************************************")
-
     print()
-    print("SUMMARY: Passed {} of {} binary interface binary_trials".format(sum(binary_trials),
-                                                                    len(binary_trials)))
+    print("SUMMARY: Passed {} of {} string interface tests".format(sum(string_trials),
+                                                                   len(string_trials)))
     print()
-    print("SUMMARY: Passed {} of {} string interface string_trials".format(sum(string_trials),
-                                                                    len(string_trials)))
+    if sum(string_trials) != len(string_trials):
+        print("WARNING: some tests failed!")
+        print("This is normal using the string interface, as it is not robust.")
+        print("This is why guessing on the argument formats (g) is a *bad* idea.")
     print()
-    
 
 if __name__ == "__main__":
     main()
+
