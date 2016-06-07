@@ -155,18 +155,16 @@ import PyCmdMessenger
 # to set the data sizes (bytes for integers, longs, floats, and doubles).  
 arduino = PyCmdMessenger.ArduinoBoard("/dev/ttyACM0",baud_rate=9600)
 
-# List of command_names in arduino file. These must be in the same order as in
-# the sketch.
-command_names = ["who_are_you","my_name_is","sum_two_ints","sum_is","error"]
-
-# List of data types being sent/recieved for each command, again in the same 
-# order. 
-command_formats = ["","s","ii","i","s"]
+# List of command names (and formats for their associated arguments). These must
+# be in the same order as in the sketch.
+commands = [["who_are_you",""],
+            ["my_name_is","s"],
+            ["sum_two_ints","ii"],
+            ["sum_is","i"],
+            ["error","s"]]
 
 # Initialize the messenger
-c = PyCmdMessenger.CmdMessenger(arduino,
-                                command_names=command_names,
-                                command_formats=command_formats)
+c = PyCmdMessenger.CmdMessenger(arduino,commands)
 
 # Send
 c.send("who_are_you")
@@ -288,83 +286,6 @@ c.sendCmdEnd();
 ##Python Classes
 
 ```
-CmdMessenger 
-    Basic interface for interfacing over a serial connection to an arduino 
-    using the CmdMessenger library.
-
-    Static methods
-    --------------
-    __init__(self, board_instance, command_names, command_formats=None, field_separator=',', command_separator=';', escape_separator='/', warnings=True)
-        Input:
-        board_instance:
-            instance of ArduinoBoard initialized with correct serial 
-            connection (points to correct serial with correct baud rate) and
-            correct board parameters (float bytes, etc.)
-
-        command_names:
-            a list or tuple of the command names specified in the arduino
-            .ino file *in the same order they are listed there.*  
-
-        command_formats:
-            a list or tuple of strings that specify the formats of the
-            commands in command names.  Optional but *highly* recommmended.
-            Default: None
-
-        field_separator:
-            character that separates fields within a message
-            Default: ","
-
-        command_separator:
-            character that separates messages (commands) from each other
-            Default: ";" 
-
-        escape_separator:
-            escape character to allow separators within messages.
-            Default: "/"
-
-        warnings:
-            warnings for user
-            Default: True
-
-        The separators and escape_separator should match what's
-        in the arduino code that initializes the CmdMessenger.  The default
-        separator values match the default values as of CmdMessenger 4.0.
-
-    receive(self, arg_formats=None)
-        Recieve commands coming off the serial port. 
-
-        arg_formats optional, but highly recommended if you do not initialize
-        the class instance with a command_formats argument.  The keyword  
-        specifies the formats to use to parse incoming arguments.  If specified
-        here, arg_formats supercedes command_formats specified on initialization.
-
-    send(self, cmd, *args)
-        Send a command (which may or may not have associated arguments) to an 
-        arduino using the CmdMessage protocol.  The command and any parameters
-        should be passed as direct arguments to send.  
-
-        arg_formats optional, but highly recommended if you do not initialize
-        the class instance with a command_formats argument.  The keyword  
-        specifies the formats to use for each argument when passed to the
-        arduino. If specified here, arg_formats supercedes command_formats
-        specified on initialization.
-
-    Instance variables
-    ------------------
-    board
-
-    command_formats
-
-    command_names
-
-    command_separator
-
-    escape_separator
-
-    field_separator
-
-    give_warnings
-
 ArduinoBoard 
     Class for connecting to an Arduino board over USB using PyCmdMessenger.  
     The board holds the serial handle (which, in turn, holds the device name,
@@ -439,4 +360,74 @@ ArduinoBoard
     unsigned_long_max
 
     unsigned_long_min
+
+CmdMessenger 
+    Basic interface for interfacing over a serial connection to an arduino 
+    using the CmdMessenger library.
+
+    Static methods
+    --------------
+    __init__(self, board_instance, commands, field_separator=',', command_separator=';', escape_separator='/', warnings=True)
+        Input:
+        board_instance:
+            instance of ArduinoBoard initialized with correct serial 
+            connection (points to correct serial with correct baud rate) and
+            correct board parameters (float bytes, etc.)
+
+        commands:
+            a list or tuple of commands specified in the arduino .ino file
+            *in the same order* they are listed there.  commands should be
+            a list of lists, where the first element in the list specifies
+            the command name and the second the formats for the arguments.
+            (e.g. commands = [["who_are_you",""],["my_name_is","s"]])
+
+        field_separator:
+            character that separates fields within a message
+            Default: ","
+
+        command_separator:
+            character that separates messages (commands) from each other
+            Default: ";" 
+
+        escape_separator:
+            escape character to allow separators within messages.
+            Default: "/"
+
+        warnings:
+            warnings for user
+            Default: True
+
+        The separators and escape_separator should match what's
+        in the arduino code that initializes the CmdMessenger.  The default
+        separator values match the default values as of CmdMessenger 4.0.
+
+    receive(self, arg_formats=None)
+        Recieve commands coming off the serial port. 
+
+        arg_formats is an optimal keyword that specifies the formats to use to
+        parse incoming arguments.  If specified here, arg_formats supercedes
+        the formats specified on initialization.
+
+    send(self, cmd, *args)
+        Send a command (which may or may not have associated arguments) to an 
+        arduino using the CmdMessage protocol.  The command and any parameters
+        should be passed as direct arguments to send.  
+
+        arg_formats is an optional string that specifies the formats to use for
+        each argument when passed to the arduino. If specified here,
+        arg_formats supercedes formats specified on initialization.
+
+    Instance variables
+    ------------------
+    board
+
+    command_separator
+
+    commands
+
+    escape_separator
+
+    field_separator
+
+    give_warnings
 ```

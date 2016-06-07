@@ -9,18 +9,16 @@ import PyCmdMessenger
 # to set the data sizes (bytes for integers, longs, floats, and doubles).  
 arduino = PyCmdMessenger.ArduinoBoard("/dev/ttyACM0",baud_rate=9600)
 
-# List of command_names in arduino file. These must be in the same order as in
-# the sketch.
-command_names = ["who_are_you","my_name_is","sum_two_ints","sum_is","error"]
-
-# List of data types being sent/recieved for each command, again in the same 
-# order. 
-command_formats = ["","s","ii","i","s"]
+# List of commands and their associated argument formats. These must be in the
+# same order as in the sketch.
+commands = [["who_are_you",""],
+            ["my_name_is","s"],
+            ["sum_two_ints","ii"],
+            ["sum_is","i"],
+            ["error","s"]]
 
 # Initialize the messenger
-c = PyCmdMessenger.CmdMessenger(arduino,
-                                command_names=command_names,
-                                command_formats=command_formats)
+c = PyCmdMessenger.CmdMessenger(arduino,commands)
 
 # Send
 c.send("who_are_you")

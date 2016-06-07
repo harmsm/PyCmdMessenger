@@ -12,25 +12,25 @@ import time, string, sys, struct, random
 
 BAUD_RATE = 115200
 
-COMMAND_NAMES = ["kCommError",
-                 "kComment",
-                 "kAcknowledge",
-                 "kAreYouReady",
-                 "kError",
-                 "kAskUsIfReady",
-                 "kYouAreReady",
-                 "kValuePing",
-                 "kValuePong",
-                 "kMultiValuePing",
-                 "kMultiValuePong",
-                 "kRequestReset",
-                 "kRequestResetAcknowledge",
-                 "kRequestSeries",
-                 "kReceiveSeries",
-                 "kDoneReceiveSeries",
-                 "kPrepareSendSeries",
-                 "kSendSeries",
-                 "kAckSendSeries"]
+COMMANDS = [["kCommError",""],
+            ["kComment",""],
+            ["kAcknowledge",""],
+            ["kAreYouReady","si"],
+            ["kError","s"],
+            ["kAskUsIfReady","s"],
+            ["kYouAreReady","s"],
+            ["kValuePing","gg"],
+            ["kValuePong","g"],
+            ["kMultiValuePing","ild"],
+            ["kMultiValuePong","ild"],
+            ["kRequestReset",""],
+            ["kRequestResetAcknowledge",""],
+            ["kRequestSeries","if"],
+            ["kReceiveSeries",""],
+            ["kDoneReceiveSeries",""],
+            ["kPrepareSendSeries",""],
+            ["kSendSeries",""],
+            ["kAckSendSeries",""]]
 
 TYPE_LIST = ["kBool",
              "kInt16",
@@ -244,7 +244,7 @@ class PingPong:
     
         self.type_name = type_name
         self.connection = PyCmdMessenger.CmdMessenger(board_instance=board,
-                                                      command_names=COMMAND_NAMES,
+                                                      commands=COMMANDS,
                                                       warnings=False)
         self.test_class = test_class
         self.command = command

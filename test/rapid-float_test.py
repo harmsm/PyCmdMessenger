@@ -26,7 +26,8 @@ def main(argv=None):
         raise IndexError(err)
 
     a = PyCmdMessenger.ArduinoBoard(serial_device,115200)
-    c = PyCmdMessenger.CmdMessenger(a,["double_ping","double_pong"],["d","d"])
+    c = PyCmdMessenger.CmdMessenger(a,[["double_ping","d"],
+                                       ["double_pong","d"]])
 
     for i in range(10000):
 
