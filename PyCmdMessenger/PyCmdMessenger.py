@@ -159,7 +159,7 @@ class CmdMessenger:
         fields = ["{}".format(command_as_int).encode("ascii")]
         for i, a in enumerate(args):
             fields.append(self._send_methods[arg_format_list[i]](a))
-            fields[-1] = self._escape_re.sub(self._byte_escape_sep + rb'\1',fields[-1])
+            fields[-1] = self._escape_re.sub(self._byte_escape_sep + r"\1".encode("ascii"),fields[-1])
 
         # Make something that looks like cmd,field1,field2,field3;
         compiled_bytes = self._byte_field_sep.join(fields) + self._byte_command_sep
