@@ -62,6 +62,9 @@ class CmdMessenger:
         """
 
         self.board = board_instance
+        if not self.board.connected:
+            err = "Arduino not connected on {}\n".format(self.board.device)
+            raise IOError(err)
 
         self.commands = commands[:]
         self.field_separator = field_separator
