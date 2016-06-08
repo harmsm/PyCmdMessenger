@@ -5,6 +5,10 @@ import sys
 # Try using setuptools first, if it's installed
 from setuptools import setup, find_packages
 
+if sys.version_info[0] == 3 and sys.version_info[1] < 3:
+    sys.exit('Sorry, library requires Python >3.3')
+
+
 # Need to add all dependencies to setup as we go!
 setup(name='PyCmdMessenger',
       packages=['PyCmdMessenger'],
