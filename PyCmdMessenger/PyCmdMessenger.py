@@ -21,8 +21,7 @@ class CmdMessenger:
     
     def __init__(self,
                  board_instance,
-                 command_names,
-                 command_formats=None,
+                 commands,
                  field_separator=",",
                  command_separator=";",
                  escape_separator="/",
@@ -34,14 +33,12 @@ class CmdMessenger:
                 connection (points to correct serial with correct baud rate) and
                 correct board parameters (float bytes, etc.)
 
-            command_names:
-                a list or tuple of the command names specified in the arduino
-                .ino file *in the same order they are listed there.*  
-
-            command_formats:
-                a list or tuple of strings that specify the formats of the
-                commands in command names.  Optional but *highly* recommmended.
-                Default: None
+            commands:
+                a list or tuple of commands specified in the arduino .ino file
+                *in the same order* they are listed there.  commands should be
+                a list of lists, where the first element in the list specifies
+                the command name and the second the formats for the arguments.
+                (e.g. commands = [["who_are_you",""],["my_name_is","s"]])
 
             field_separator:
                 character that separates fields within a message
@@ -66,24 +63,19 @@ class CmdMessenger:
 
         self.board = board_instance
 
-        self.command_names = command_names[:]
-        self._cmd_name_to_int = dict([(n,i) for i,n in enumerate(self.command_names)])
-
-        self.command_formats = command_formats
-        self._cmd_name_to_format = {}
-        if self.command_formats != None:
-            if len(self.command_formats) != len(self.command_names):
-                err = "You must specify the same number of command formats and command names."
-                raise ValueError(err)
-
-            for i in range(len(self.command_names)):
-                self._cmd_name_to_format[self.command_names[i]] = self.command_formats[i]
-
+        self.commands = commands[:]
         self.field_separator = field_separator
         self.command_separator = command_separator
         self.escape_separator = escape_separator
-  
         self.give_warnings = warnings
+
+        self._cmd_name_to_int = {}
+        self._int_to_cmd_name = {}
+        self._cmd_name_to_format = {}
+        for i, c in enumerate(commands):
+            self._cmd_name_to_int[c[0]] = i
+            self._int_to_cmd_name[i] = c[0]
+            self._cmd_name_to_format[c[0]] = c[1]
  
         self._byte_field_sep = self.field_separator.encode("ascii")
         self._byte_command_sep = self.command_separator.encode("ascii")
@@ -126,11 +118,9 @@ class CmdMessenger:
         arduino using the CmdMessage protocol.  The command and any parameters
         should be passed as direct arguments to send.  
 
-        arg_formats optional, but highly recommended if you do not initialize
-        the class instance with a command_formats argument.  The keyword  
-        specifies the formats to use for each argument when passed to the
-        arduino. If specified here, arg_formats supercedes command_formats
-        specified on initialization.  
+        arg_formats is an optional string that specifies the formats to use for
+        each argument when passed to the arduino. If specified here,
+        arg_formats supercedes formats specified on initialization.  
         """
 
         # Turn the command into an integer.
@@ -178,10 +168,9 @@ class CmdMessenger:
         """
         Recieve commands coming off the serial port. 
 
-        arg_formats optional, but highly recommended if you do not initialize
-        the class instance with a command_formats argument.  The keyword  
-        specifies the formats to use to parse incoming arguments.  If specified
-        here, arg_formats supercedes command_formats specified on initialization.  
+        arg_formats is an optimal keyword that specifies the formats to use to
+        parse incoming arguments.  If specified here, arg_formats supercedes
+        the formats specified on initialization.  
         """
 
         # Read serial input until a command separator or empty character is
@@ -206,7 +195,6 @@ class CmdMessenger:
                     msg[-1].append(self._byte_escape_sep)
                     msg[-1].append(tmp)
                     escaped = False
-
             else:
 
                 # look for escape character
@@ -251,7 +239,7 @@ class CmdMessenger:
         # Get the command name.
         cmd = fields[0].strip().decode()
         try:
-            cmd_name = self.command_names[int(cmd)]
+            cmd_name = self._int_to_cmd_name[int(cmd)]
         except (ValueError,IndexError):
 
             if self.give_warnings:
@@ -310,7 +298,6 @@ class CmdMessenger:
             raise OverflowError(err)
 
         return struct.pack('c',value)
-
 
     def _send_int(self,value):
         """
