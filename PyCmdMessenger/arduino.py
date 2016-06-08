@@ -58,11 +58,9 @@ class ArduinoBoard:
         self.baud_rate = baud_rate
 
         # Open up the serial port
-        self.comm = serial.Serial(self.device,
-                                  self.baud_rate,
-                                  timeout=self.timeout)
+        self._is_connected = False
+        self.open()
 
-        time.sleep(self.settle_time)
 
         #----------------------------------------------------------------------
         # Figure out proper type limits given the board specifications
@@ -141,6 +139,23 @@ class ArduinoBoard:
             err = "float and double bytes must be one of {}".format(keys())
             raise ValueError(err)
 
+    def open(self):
+        """
+        Open the serial connection.
+        """
+
+        if not self._is_connected:
+            
+            print("Connecting to arduino on {}... ".format(self.device),end="")
+            self.comm = serial.Serial(self.device,
+                                      self.baud_rate,
+                                      timeout=self.timeout)
+        
+
+            time.sleep(self.settle_time)
+            self._is_connected = True
+
+            print("done.")
 
     def read(self):
         """
@@ -168,6 +183,14 @@ class ArduinoBoard:
         Close serial connection.
         """
 
-        self.comm.close() 
+        if self._is_connected:
+            self.comm.close()
+        self._is_connected = False
 
-
+    @property
+    def connected(self):
+        """
+        Return connection state.  Connected (True), disconnected (False).
+        """
+    
+        return self._is_connected
