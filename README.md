@@ -16,6 +16,8 @@ obviously builds off of their excellent work.
  * From PyPI:
     + `sudo pip3 install PyCmdMessenger`
 
+For python2.7, replace `python3` with `python` and `pip3` with `pip`
+
 To test the library:
  * Clone the source from git
  * Compile the arduino sketch in the `pingpong_arduino` directory
@@ -24,7 +26,7 @@ To test the library:
    types between the local computer and the arduino.  
 
 ### Compatibility
- * Compatibility: python >=3.3
+ * Compatibility: python 2.7, 3.x
  * Should work on all platforms supported by pyserial.  
  * Tested on a Raspberry Pi (raspbian) and linux machine (Ununtu 15.10).  Have 
 not tested on Windows or OSX, but it should work fine.
