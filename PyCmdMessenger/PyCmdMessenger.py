@@ -70,9 +70,11 @@ class CmdMessenger:
         self.give_warnings = warnings
 
         self._cmd_name_to_int = {}
+        self._int_to_cmd_name = {}
         self._cmd_name_to_format = {}
         for i, c in enumerate(commands):
             self._cmd_name_to_int[c[0]] = i
+            self._int_to_cmd_name[i] = c[0]
             self._cmd_name_to_format[c[0]] = c[1]
  
         self._byte_field_sep = self.field_separator.encode("ascii")
@@ -237,7 +239,7 @@ class CmdMessenger:
         # Get the command name.
         cmd = fields[0].strip().decode()
         try:
-            cmd_name = self.command_names[int(cmd)]
+            cmd_name = self._int_to_cmd_name[int(cmd)]
         except (ValueError,IndexError):
 
             if self.give_warnings:

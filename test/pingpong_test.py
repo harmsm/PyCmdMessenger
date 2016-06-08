@@ -14,7 +14,7 @@ BAUD_RATE = 115200
 
 COMMANDS = [["kCommError",""],
             ["kComment",""],
-            ["kAcknowledge",""],
+            ["kAcknowledge","s"],
             ["kAreYouReady","si"],
             ["kError","s"],
             ["kAskUsIfReady","s"],
