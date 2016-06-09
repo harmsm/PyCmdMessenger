@@ -148,6 +148,9 @@ class CmdMessenger:
             except KeyError:
                 # if not, guess for all arguments
                 arg_format_list = ["g" for i in range(len(args))]
+  
+        # Deal with "*" format  
+        arg_format_list = self._treat_star_format(arg_format_list,arg_list)
 
         if len(args) > 0:
             if len(arg_format_list) != len(args):
@@ -266,6 +269,9 @@ class CmdMessenger:
                 # if not, guess for all arguments
                 arg_format_list = ["g" for i in range(len(fields[1:]))]
 
+        # Deal with "*" format  
+        arg_format_list = self._treat_star_format(arg_format_list,fields[1:])
+
         if len(fields[1:]) > 0:
             if len(arg_format_list) != len(fields[1:]):
                 err = "Number of argument formats must match the number of recieved arguments."
@@ -279,6 +285,32 @@ class CmdMessenger:
         message_time = time.time()
 
         return cmd_name, received, message_time
+
+    def _treat_star_format(self,arg_format_list,arg_list):
+        """
+        Deal with "*" format if specified.
+        """
+
+        num_stars = len([a for a in arg_format_list if a == "*"])
+        if len(num_stars) > 0:
+
+            # Make sure the repeated format argument only occurs once, is last,
+            # and that there is at least one format in addition to it.
+            if num_stars == 1 and arg_format_list[-1] == "*" and len(arg_format_list) > 1:
+
+                # Trim * from end
+                arg_format_list = arg_format_list[:-1]
+
+                # If we need extra arguments...
+                if len(arg_format_list) < len(args):
+                    f = arg_format_list[-1]
+                    len_diff = len(args) - len(arg_format_list)
+                    arg_format_list.extend([f for i in range(len_diff)])
+            else:
+                err = "'*' format must occur only once, be at end of string, and be preceded by at least one other format."
+                raise ValueError(err)
+
+        return arg_format_list 
 
     def _send_char(self,value):
         """
