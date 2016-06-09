@@ -1,5 +1,7 @@
 #include "CmdMessenger.h"  
 
+/* Basic test code for sending multiple values back and forth with a * format. */
+
 CmdMessenger c = CmdMessenger(Serial, ',',';','/');
 
 enum
