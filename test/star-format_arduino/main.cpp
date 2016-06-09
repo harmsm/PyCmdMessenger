@@ -6,25 +6,25 @@ CmdMessenger c = CmdMessenger(Serial, ',',';','/');
 
 enum
 {
-    multi_ping,        // expects three doubles
-    multi_pong,        // returns three doubles
+    multi_ping,        // expects some number of longs
+    multi_pong,        // expects some number of longs
 };
 
 void on_multi_ping(void){
 
     int i;
-    double value;
-    long random_number, trimmed_random;
+    int series_length;
 
-    random_number = random(1,15);
-    trimmed_random = random_number;
+    // first argument says how many more arguments we're going to get
+    series_length = c.readBinArg<int>();
 
     c.sendCmdStart(multi_pong);
-    for (i = 0; i < random_number; i++){
-        c.sendCmdBinArg(trimmed_random);
-        trimmed_random = trimmed_random - 1;
+    for (i = 0; i < series_length; i++){
+        c.sendCmdBinArg(c.readBinArg<int>()); 
+        delay(50);
     }
     c.sendCmdEnd();
+
 
 }
 
@@ -37,7 +37,6 @@ void attach_callbacks()
 void setup() 
 {
   Serial.begin(115200); 
-  randomSeed(analogRead(0));
   attach_callbacks();
 }
 

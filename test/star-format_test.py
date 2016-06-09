@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 __description__ = \
 """
-Test the use of the * format.
+Test the use of the * format. It sends a random list of longs (without a pre-
+specified length of the list) and then receives it (again, without a specified
+list length). 
 """
 __author__ = "Michael J. Harms"
 __date__ = "2016-06-08"
@@ -22,23 +24,24 @@ def main(argv=None):
         raise IndexError(err)
 
     a = PyCmdMessenger.ArduinoBoard(serial_device,115200)
-    c = PyCmdMessenger.CmdMessenger(a,[["multi_ping",""],
-                                       ["multi_pong","l*"]])
+    c = PyCmdMessenger.CmdMessenger(a,[["multi_ping","i*"],
+                                       ["multi_pong","i*"]])
 
+    
     for i in range(10):
+       
+        num_args = random.choice(range(1,10)) 
+        sent_values = [random.choice(range(10)) for j in range(num_args)]
+        c.send("multi_ping",len(sent_values),*sent_values)
 
-        c.send("multi_ping")
         received_cmd = c.receive()
-
-        print(received_cmd)
 
         cmd = received_cmd[0]
         received = received_cmd[1]
-        expected_values = list(range(received[0],0,-1))
 
         success = 1
         for i, r in enumerate(received):
-            if expected_values[i] == r:
+            if sent_values[i] == r:
                 success *= 1
             else:
                 success = 0
@@ -49,7 +52,7 @@ def main(argv=None):
             success = "PASS"
 
         print("{:10s} --> {} --> {} --> {:4}".format(cmd,
-                                                     expected_values,
+                                                     sent_values,
                                                      received,
                                                      success))
 

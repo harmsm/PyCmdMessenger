@@ -150,7 +150,7 @@ class CmdMessenger:
                 arg_format_list = ["g" for i in range(len(args))]
   
         # Deal with "*" format  
-        arg_format_list = self._treat_star_format(arg_format_list,arg_list)
+        arg_format_list = self._treat_star_format(arg_format_list,args)
 
         if len(args) > 0:
             if len(arg_format_list) != len(args):
@@ -286,13 +286,13 @@ class CmdMessenger:
 
         return cmd_name, received, message_time
 
-    def _treat_star_format(self,arg_format_list,arg_list):
+    def _treat_star_format(self,arg_format_list,args):
         """
         Deal with "*" format if specified.
         """
 
         num_stars = len([a for a in arg_format_list if a == "*"])
-        if len(num_stars) > 0:
+        if num_stars > 0:
 
             # Make sure the repeated format argument only occurs once, is last,
             # and that there is at least one format in addition to it.
@@ -305,7 +305,9 @@ class CmdMessenger:
                 if len(arg_format_list) < len(args):
                     f = arg_format_list[-1]
                     len_diff = len(args) - len(arg_format_list)
-                    arg_format_list.extend([f for i in range(len_diff)])
+                    tmp = list(arg_format_list)
+                    tmp.extend([f for i in range(len_diff)])
+                    arg_format_list = "".join(tmp)
             else:
                 err = "'*' format must occur only once, be at end of string, and be preceded by at least one other format."
                 raise ValueError(err)
