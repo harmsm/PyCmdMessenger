@@ -1,7 +1,7 @@
 #PyCmdMessenger
 
 Python class for communication with an arduino using the
-[CmdMessenger](https://github.com/thijse/Arduino-CmdMessenger) serial
+[CmdMessenger](https://github.com/utk-robotics-2017/Arduino-CmdMessenger) serial
 communication library. It sends and recieves messages, automatically converting
 python data types to arduino types and vice versa.  
 
@@ -10,7 +10,7 @@ obviously builds off of their excellent work.
 
 ### Installation:
  * From github: 
-    + `git clone https://github.com/harmsm/PyCmdMessenger.git` 
+    + `git clone https://github.com/utk-robotics-2017/PyCmdMessenger.git` 
     + `cd PyCmdMessenger`
     + `sudo python3 setup.py install`
  * From PyPI:
@@ -31,14 +31,14 @@ not tested on Windows or OSX, but it should work fine.
 
 ### Dependencies
  * pyserial (on local machine): https://github.com/pyserial/pyserial
- * CmdMessenger (on Arduino): https://github.com/thijse/Arduino-CmdMessenger
+ * CmdMessenger (on Arduino): https://github.com/utk-robotics-2017/Arduino-CmdMessenger
 
 pyserial should be installed automatically by pip or the installaion script. 
 For CmdMessenger, please follow the directions on their
-[site](https://github.com/thijse/Arduino-CmdMessenger).  Copies of the 
+[site](https://github.com/utk-robotics-2017/Arduino-CmdMessenger).  Copies of the 
 CmdMessenter 4.0 main .cpp and .h files are included in the PyCmdMessenger repo
-in the [test/arduino](https://github.com/harmsm/PyCmdMessenger/tree/master/test/arduino) and
-[examples/arduino](https://github.com/harmsm/PyCmdMessenger/tree/master/examples/arduino)
+in the [test/arduino](https://github.com/utk-robotics-2017/PyCmdMessenger/tree/master/test/arduino) and
+[examples/arduino](https://github.com/utk-robotics-2017/PyCmdMessenger/tree/master/examples/arduino)
 directories. 
 
 ##Example code
@@ -68,7 +68,7 @@ To ensure stable communication with PyCmdMessenger:
  * Baud rate must match between PyCmdMessenger class and arduino sketch. 
     
 A basic example is shown below.  These files are in the 
-[examples](https://github.com/harmsm/PyCmdMessenger/tree/master/examples) directory.
+[examples](https://github.com/utk-robotics-2017/PyCmdMessenger/tree/master/examples) directory.
  
 ###Arduino
 
@@ -229,14 +229,14 @@ from the arduino.
 
 ##Testing
 
-The [test](https://github.com/harmsm/PyCmdMessenger/tree/master/test) directory
+The [test](https://github.com/utk-robotics-2017/PyCmdMessenger/tree/master/test) directory
 has an arduino sketch (in `pingpong_arduino`) that can be compiled and loaded
 onto an arudino, as well as a python test script, `pingpong_test.py`.  This will
 send a wide range of values for every data type back and forth to the arduino,
 reporting success and failure.  
 
 ##Quick reference for CmdMessenger on arduino side
-For more details, see the [CmdMessenger](https://github.com/thijse/Arduino-CmdMessenger) project page.
+For more details, see the [CmdMessenger](https://github.com/utk-robotics-2017/Arduino-CmdMessenger) project page.
 
 ###Receiving
 ```C
