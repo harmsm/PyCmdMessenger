@@ -1,11 +1,5 @@
-__description__ = \
-"""
-Python class for interfacing with CmdMessenger arduino serial communications
-library.
-"""
-__author__ = "Michael J. Harms"
-__date__ = "2016-05-23"
-__all__ = ["PyCmdMessenger","arduino"]
-
-from .PyCmdMessenger import CmdMessenger as CmdMessenger
-from .arduino import ArduinoBoard as ArduinoBoard
+import os
+import sys
+CURRENT_DIR = os.path.dirname(os.path.realpath(__file__))
+if CURRENT_DIR not in sys.path:
+    sys.path.append(CURRENT_DIR)
