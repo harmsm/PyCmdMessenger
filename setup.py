@@ -3,7 +3,7 @@
 import sys
 
 # Try using setuptools first, if it's installed
-from setuptools import setup, find_packages
+from setuptools import setup
 
 if not sys.version_info[0] == 3:
     sys.exit("Sorry, Python 3 is required")
@@ -20,4 +20,3 @@ setup(name='PyCmdMessenger',
       zip_safe=False,
       install_requires=["pyserial"],
       classifiers=['Programming Language :: Python'])
-

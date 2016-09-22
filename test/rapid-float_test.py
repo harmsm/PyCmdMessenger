@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
-__description__ = \
-"""
+import random
+import sys
+import PyCmdMessenger
+
+__description__ = """
 Test that sends 10000 floats as fast as possible back and forth to the arduino.
-It uses random number floats, so this should cover a wide variety of possible 
+It uses random number floats, so this should cover a wide variety of possible
 characters in the binary strings that could (possibly) be mangled.
 
 Works with arduino sketch in rapid-float directory.
@@ -11,13 +14,11 @@ __author__ = "Michael J. Harms"
 __date__ = "2016-06-04"
 __usage__ = "./rapid-float.py serial_device (like /dev/ttyACM0)"
 
-import random, sys
-import PyCmdMessenger
 
 def main(argv=None):
-    
-    if argv == None:
-        argv = sys.argv[1:] 
+
+    if argv is None:
+        argv = sys.argv[1:]
 
     try:
         serial_device = argv[0]
@@ -25,14 +26,14 @@ def main(argv=None):
         err = "Incorrect arguments. Usage:\n\n{}\n\n".format(__usage__)
         raise IndexError(err)
 
-    a = PyCmdMessenger.ArduinoBoard(serial_device,115200)
-    c = PyCmdMessenger.CmdMessenger(a,[["double_ping","d"],
-                                       ["double_pong","d"]])
+    a = PyCmdMessenger.ArduinoBoard(serial_device, 115200)
+    c = PyCmdMessenger.CmdMessenger(a, [["double_ping", "d"],
+                                        ["double_pong", "d"]])
 
     for i in range(10000):
 
         value = 2*(random.random() - 0.5)
-        c.send("double_ping",value)
+        c.send("double_ping", value)
         received_cmd = c.receive()
 
         cmd = received_cmd[0]

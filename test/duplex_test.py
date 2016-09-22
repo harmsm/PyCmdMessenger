@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
-__description__ = \
-"""
+import random
+import sys
+import PyCmdMessenger
+
+__description__ = """
 Test ability to send duplex data (e.g. read args while sending them out with
 an unterminated command).
 """
@@ -8,13 +11,11 @@ __author__ = "Michael J. Harms"
 __date__ = "2016-06-04"
 __usage__ = "./duplex.py serial_device (like /dev/ttyACM0)"
 
-import random, sys
-import PyCmdMessenger
 
 def main(argv=None):
-    
-    if argv == None:
-        argv = sys.argv[1:] 
+
+    if argv is None:
+        argv = sys.argv[1:]
 
     try:
         serial_device = argv[0]
@@ -22,9 +23,9 @@ def main(argv=None):
         err = "Incorrect arguments. Usage:\n\n{}\n\n".format(__usage__)
         raise IndexError(err)
 
-    a = PyCmdMessenger.ArduinoBoard(serial_device,115200)
-    c = PyCmdMessenger.CmdMessenger(a,[["double_ping","fff"],
-                                       ["double_pong","fff"]])
+    a = PyCmdMessenger.ArduinoBoard(serial_device, 115200)
+    c = PyCmdMessenger.CmdMessenger(a, [["double_ping", "fff"],
+                                        ["double_pong", "fff"]])
 
     for i in range(10):
 
@@ -32,7 +33,7 @@ def main(argv=None):
                   2*(random.random() - 0.5),
                   2*(random.random() - 0.5)]
 
-        c.send("double_ping",*values)
+        c.send("double_ping", *values)
         received_cmd = c.receive()
 
         cmd = received_cmd[0]

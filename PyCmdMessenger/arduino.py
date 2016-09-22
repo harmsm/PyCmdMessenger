@@ -1,18 +1,19 @@
-__description__ = \
-"""
+import serial
+import time
+
+__description__ = """
 Base class for allowing connections between arduino and PyCmdMessenger instances
 via USB.
 """
 __author__ = "Michael J. Harms"
 __date__ = "2016-05-30"
 
-import serial, time
 
 class ArduinoBoard:
     """
-    Class for connecting to an Arduino board over USB using PyCmdMessenger.  
+    Class for connecting to an Arduino board over USB using PyCmdMessenger.
     The board holds the serial handle (which, in turn, holds the device name,
-    baud rate, and timeout) and the board parameters (size of data types in 
+    baud rate, and timeout) and the board parameters (size of data types in
     bytes, etc.).  The default parameters are for an ArduinoUno board.
     """
 
@@ -28,7 +29,7 @@ class ArduinoBoard:
 
         """
         Serial connection parameters:
-            
+
             device: serial device (e.g. /dev/ttyACM0)
             baud_rate: baud rate set in the compiled sketch
             timeout: timeout for serial reading and writing
@@ -61,10 +62,9 @@ class ArduinoBoard:
         self._is_connected = False
         self.open()
 
-
-        #----------------------------------------------------------------------
+        # ----------------------------------------------------------------------
         # Figure out proper type limits given the board specifications
-        #----------------------------------------------------------------------
+        # ----------------------------------------------------------------------
 
         self.int_min = -2**(8*self.int_bytes-1)
         self.int_max = 2**(8*self.int_bytes-1) - 1
@@ -79,35 +79,35 @@ class ArduinoBoard:
         self.unsigned_long_max = 2**(8*self.long_bytes)-1
 
         # Set to either IEEE 754 binary32 bit or binary64 bit
-        if self.float_bytes == 4: 
+        if self.float_bytes == 4:
             self.float_min = -3.4028235E+38
-            self.float_max =  3.4028235E+38
+            self.float_max = 3.4028235E+38
         elif self.float_bytes == 8:
             self.float_min = -1e308
-            self.float_max =  1e308
+            self.float_max = 1e308
         else:
             err = "float bytes should be 4 (32 bit) or 8 (64 bit)"
             raise ValueError(err)
-        
-        if self.double_bytes == 4: 
+
+        if self.double_bytes == 4:
             self.double_min = -3.4028235E+38
-            self.double_max =  3.4028235E+38
+            self.double_max = 3.4028235E+38
         elif self.double_byes == 8:
             self.double_min = -1e308
-            self.double_max =  1e308
+            self.double_max = 1e308
         else:
             err = "double bytes should be 4 (32 bit) or 8 (64 bit)"
             raise ValueError(err)
 
-        #----------------------------------------------------------------------
+        # ----------------------------------------------------------------------
         # Create a self.XXX_type for each type based on its byte number. This
         # type can then be passed into struct.pack and struct.unpack calls to
         # properly format the bytes strings.
-        #----------------------------------------------------------------------
+        # ----------------------------------------------------------------------
 
-        INTEGER_TYPE = {2:"h",4:"i",8:"l"}
-        UNSIGNED_INTEGER_TYPE = {2:"H",4:"I",8:"L"}
-        FLOAT_TYPE = {4:"f",8:"d"}
+        INTEGER_TYPE = {2: "h", 4: "i", 8: "l"}
+        UNSIGNED_INTEGER_TYPE = {2: "H", 4: "I", 8: "L"}
+        FLOAT_TYPE = {4: "f", 8: "d"}
 
         try:
             self.int_type = INTEGER_TYPE[self.int_bytes]
@@ -115,7 +115,7 @@ class ArduinoBoard:
         except KeyError:
             keys = list(INTEGER_TYPE.keys())
             keys.sort()
-            
+
             err = "integer bytes must be one of {}".format(keys())
             raise ValueError(err)
 
@@ -125,17 +125,17 @@ class ArduinoBoard:
         except KeyError:
             keys = list(INTEGER_TYPE.keys())
             keys.sort()
-            
+
             err = "long bytes must be one of {}".format(keys())
             raise ValueError(err)
-    
+
         try:
             self.float_type = FLOAT_TYPE[self.float_bytes]
             self.double_type = FLOAT_TYPE[self.double_bytes]
         except KeyError:
             keys = list(self.FLOAT_TYPE.keys())
             keys.sort()
-            
+
             err = "float and double bytes must be one of {}".format(keys())
             raise ValueError(err)
 
@@ -145,12 +145,11 @@ class ArduinoBoard:
         """
 
         if not self._is_connected:
-            
-            print("Connecting to arduino on {}... ".format(self.device),end="")
+
+            print("Connecting to arduino on {0:s}... ".format(self.device), end="")
             self.comm = serial.Serial(self.device,
                                       self.baud_rate,
                                       timeout=self.timeout)
-        
 
             time.sleep(self.settle_time)
             self._is_connected = True
@@ -168,14 +167,14 @@ class ArduinoBoard:
         """
         Wrap serial readline method.
         """
-        
+
         return self.comm.readline()
 
-    def write(self,msg):
+    def write(self, msg):
         """
         Wrap serial write method.
         """
-        
+
         self.comm.write(msg)
 
     def close(self):
@@ -192,5 +191,5 @@ class ArduinoBoard:
         """
         Return connection state.  Connected (True), disconnected (False).
         """
-    
+
         return self._is_connected
