@@ -153,8 +153,8 @@ class ArduinoBoard:
 
             self.comm = serial.Serial()
             self.comm.device = self.device
-            self.comm.baud_rate = baud_rate
-            self.comm.timeout = timeout
+            self.comm.baud_rate = self.baud_rate
+            self.comm.timeout = self.timeout
             self.comm.setDTR(self.dtr_setting)
             self.comm.open()
 
