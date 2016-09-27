@@ -21,7 +21,7 @@ class ArduinoBoard:
                  baud_rate=9600,
                  timeout=1.0,
                  settle_time=2.0,
-                 disable_dtr=True,
+                 enable_dtr=False,
                  int_bytes=2,
                  long_bytes=4,
                  float_bytes=4,
@@ -34,7 +34,7 @@ class ArduinoBoard:
             baud_rate: baud rate set in the compiled sketch
             timeout: timeout for serial reading and writing
             settle_time: how long to wait before trying to access serial port
-            disable_dtr: disable DTR (preventing reset on opening connection)
+            enable_dtr: use DTR (set to False to prevent arduino reset on connect)
 
         Board input parameters:
             int_bytes: number of bytes to store an integer
@@ -52,7 +52,7 @@ class ArduinoBoard:
         self.baud_rate = baud_rate
         self.timeout = timeout
         self.settle_time = settle_time
-        self.dtr_setting = not disable_dtr
+        self.enable_dtr = enable_dtr
 
         self.int_bytes = int_bytes
         self.long_bytes = long_bytes
@@ -152,10 +152,10 @@ class ArduinoBoard:
             print("Connecting to arduino on {}... ".format(self.device),end="")
 
             self.comm = serial.Serial()
-            self.comm.device = self.device
-            self.comm.baud_rate = self.baud_rate
+            self.comm.port = self.device
+            self.comm.baudrate = self.baud_rate
             self.comm.timeout = self.timeout
-            self.comm.setDTR(self.dtr_setting)
+            self.dtr = self.enable_dtr
             self.comm.open()
 
             time.sleep(self.settle_time)

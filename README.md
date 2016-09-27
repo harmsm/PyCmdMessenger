@@ -235,6 +235,10 @@ onto an arudino, as well as a python test script, `pingpong_test.py`.  This will
 send a wide range of values for every data type back and forth to the arduino,
 reporting success and failure.  
 
+##Known Issues
+
+ + Opening the serial connection from a linux machine will cause the arduino to reset.  This is a [known issue](https://github.com/pyserial/pyserial/issues/124) with PySerial.  This behavior can be prevented from a windows host using by setting `ardino.ArduinoBoard(enable_dtr=False)` (the default).  
+
 ##Quick reference for CmdMessenger on arduino side
 For more details, see the [CmdMessenger](https://github.com/thijse/Arduino-CmdMessenger) project page.
 
