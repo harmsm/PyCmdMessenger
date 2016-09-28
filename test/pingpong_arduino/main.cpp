@@ -323,6 +323,17 @@ void toggleLed()
 void setup() 
 {
   // Listen on serial connection for messages from the pc
+
+
+  pinMode(5,OUTPUT);
+  // Start by blinking LED for 1 s
+  pinMode(LED_BUILTIN,OUTPUT);
+  for (int i = 0; i < 5; i++){
+    digitalWrite(LED_BUILTIN,HIGH);
+    delay(50*i);
+    digitalWrite(LED_BUILTIN,LOW);
+    delay(50*i);
+  }
   
   // 115200 is the max speed on Arduino Uno, Mega, with AT8u2 USB
   // SERIAL_8N1 is the default config, but we want to make certain
@@ -362,6 +373,7 @@ bool hasExpired(unsigned long &prevTime, unsigned long interval) {
 
 void loop() 
 {
+  analogWrite(5,255); //pwm_value);
   // Process incoming serial data, and perform callbacks
   cmdMessenger.feedinSerialData();
 
@@ -369,7 +381,7 @@ void loop()
   // this means the callbacks my the Messenger are taking a longer time than that  
   if (hasExpired(previousToggleLed,2000)) // Every 2 secs
   {
-    toggleLed();  
+    //toggleLed();  
   } 
 }
 
