@@ -95,7 +95,7 @@ class ArduinoBoard:
         if self.double_bytes == 4: 
             self.double_min = -3.4028235E+38
             self.double_max =  3.4028235E+38
-        elif self.double_byes == 8:
+        elif self.double_bytes == 8:
             self.double_min = -1e308
             self.double_max =  1e308
         else:

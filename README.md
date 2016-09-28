@@ -24,10 +24,9 @@ To test the library:
    types between the local computer and the arduino.  
 
 ### Compatibility
- * Compatibility: 3.x
+ * Compatibility: Python 3.x
  * Should work on all platforms supported by pyserial.  
- * Tested on a Raspberry Pi (raspbian) and linux machine (Ununtu 15.10).  Have 
-not tested on Windows or OSX, but it should work fine.
+ * Known to work on Raspberry Pi (raspbian), linux (Ubuntu 15.10), and Windows 10. 
 
 ### Dependencies
  * pyserial (on local machine): https://github.com/pyserial/pyserial
@@ -237,7 +236,7 @@ reporting success and failure.
 
 ##Known Issues
 
- + Opening the serial connection from a linux machine will cause the arduino to reset.  This is a [known issue](https://github.com/pyserial/pyserial/issues/124) with PySerial.  This behavior can be prevented from a windows host using by setting `ardino.ArduinoBoard(enable_dtr=False)` (the default).  
+ + Opening the serial connection from a linux machine will cause the arduino to reset.  This is a [known issue](https://github.com/pyserial/pyserial/issues/124) with pyserial and the arudino architecture.  This behavior can be prevented on a windows host using by setting `arduino.ArduinoBoard(enable_dtr=False)` (the default). See [issue #9](https://github.com/harmsm/PyCmdMessenger/issues/9) for discussion.  
 
 ##Quick reference for CmdMessenger on arduino side
 For more details, see the [CmdMessenger](https://github.com/thijse/Arduino-CmdMessenger) project page.
@@ -294,13 +293,14 @@ ArduinoBoard
 
     Static methods
     --------------
-    __init__(self, device, baud_rate=9600, timeout=1.0, settle_time=2.0, int_bytes=2, long_bytes=4, float_bytes=4, double_bytes=4)
+    __init__(self, device, baud_rate=9600, timeout=1.0, settle_time=2.0, enable_dtr=False, int_bytes=2, long_bytes=4, float_bytes=4, double_bytes=4)
         Serial connection parameters:
             
             device: serial device (e.g. /dev/ttyACM0)
             baud_rate: baud rate set in the compiled sketch
             timeout: timeout for serial reading and writing
             settle_time: how long to wait before trying to access serial port
+            enable_dtr: use DTR (set to False to prevent arduino reset on connect)
 
         Board input parameters:
             int_bytes: number of bytes to store an integer
