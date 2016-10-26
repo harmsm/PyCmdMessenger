@@ -76,7 +76,6 @@ enum
 enum
 {
   kBool,
-  kByte,
   kInt16,
   kInt32,
   kFloat,

@@ -79,7 +79,7 @@ class ByteTest(Test):
    
     def __init__(self):
         
-        self.test_set = list(range(-1,257,2))
+        self.test_set = list(range(0,258,2))
 
 class IntTest(Test):
     """
