@@ -76,6 +76,7 @@ enum
 enum
 {
   kBool,
+  kByte,
   kInt16,
   kInt32,
   kFloat,
@@ -85,6 +86,7 @@ enum
   kChar,
   kString,
   kBBool,
+  kBByte,
   kBInt16,
   kBInt32,
   kBFloat,
@@ -134,6 +136,7 @@ void OnValuePing()
        cmdMessenger.sendCmd(kValuePong, value);
         break;
       }
+
       case kInt16:
       {
         int value = cmdMessenger.readInt16Arg();
@@ -174,6 +177,13 @@ void OnValuePing()
       case kBBool:
       {
          bool value = cmdMessenger.readBinArg<bool>();
+         cmdMessenger.sendBinCmd(kValuePong, value);
+         break;
+      }
+      // Binary values
+      case kBByte:
+      {
+         byte value = cmdMessenger.readBinArg<byte>();
          cmdMessenger.sendBinCmd(kValuePong, value);
          break;
       }

@@ -42,6 +42,7 @@ TYPE_LIST = ["kBool",
              "kChar",
              "kString",
              "kBBool",
+             "kBByte",
              "kBInt16",
              "kBInt32",
              "kBFloat",
@@ -70,6 +71,15 @@ class BoolTest(Test):
     def __init__(self):
 
         self.test_set = [0,1,True,False]
+
+class ByteTest(Test):
+    """
+    Class for testing int ping pong.
+    """
+   
+    def __init__(self):
+        
+        self.test_set = list(range(-1,257,2))
 
 class IntTest(Test):
     """
@@ -377,6 +387,7 @@ def main(argv=None):
 
     # Create a series of test instances
     bool_test = BoolTest()
+    byte_test = ByteTest()
     int_test = IntTest()
     long_test = LongTest()
     float_test = FloatTest()
@@ -391,6 +402,9 @@ def main(argv=None):
     binary_trials = []
     t = PingPong("kBBool",board,bool_test)
     binary_trials.extend(t.run_tests(send_arg_formats="g?",receive_arg_formats="?"))
+
+    t = PingPong("kBByte",board,byte_test)
+    binary_trials.extend(t.run_tests(send_arg_formats="gb",receive_arg_formats="b"))
 
     t = PingPong("kChar",board,char_test)
     binary_trials.extend(t.run_tests(send_arg_formats="gc",receive_arg_formats="c"))
