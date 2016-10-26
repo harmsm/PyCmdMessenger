@@ -193,6 +193,7 @@ command, an empty string (`""`) or `None` can be used for the format.
 | format | arduino type  | Python Type              | Arduino receive                                       | Arduino send                        |
 |--------|---------------|--------------------------|-------------------------------------------------------|-------------------------------------|
 | "i"    | int           | int                      | `int value = c.readBinArg<int>();`                    | `c.sendBinCmd(COMMAND_NAME,value);` |
+| "b"    | byte          | int                      | `int value = c.readBinArg<byte>();`                   | `c.sendBinCmd(COMMAND_NAME,value);` |
 | "I"    | unsigned int  | int                      | `unsigned int value = c.readBinArg<unsigned int>();`  | `c.sendBinCmd(COMMAND_NAME,value);` |
 | "l"    | long          | int                      | `long value = c.readBinArg<long>();`                  | `c.sendBinCmd(COMMAND_NAME,value);` |
 | "L"    | unsigned long | int                      | `unsigned long value = c.readBinArg<unsigned long>();`| `c.sendBinCmd(COMMAND_NAME,value);` |
