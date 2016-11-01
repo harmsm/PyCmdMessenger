@@ -94,6 +94,7 @@ class CmdMessenger:
                                                            self.escape_separator).encode('ascii'))
 
         self._send_methods = {"c":self._send_char,
+                              "b":self._send_byte,
                               "i":self._send_int,
                               "I":self._send_unsigned_int,
                               "l":self._send_long,
@@ -105,6 +106,7 @@ class CmdMessenger:
                               "g":self._send_guess}
 
         self._recv_methods = {"c":self._recv_char,
+                              "b":self._recv_byte,
                               "i":self._recv_int,
                               "I":self._recv_unsigned_int,
                               "l":self._recv_long,
@@ -302,6 +304,29 @@ class CmdMessenger:
 
         return struct.pack('c',value)
 
+    def _send_byte(self,value):
+        """
+        Convert a numerical value into an integer, then to a byte object. Check
+        bounds for byte.
+        """
+
+        # Coerce to int. This will throw a ValueError if the value can't
+        # actually be converted.
+        if type(value) != int:
+            new_value = int(value)
+
+            if self.give_warnings:
+                w = "Coercing {} into int ({})".format(value,new_value)
+                warnings.warn(w,Warning)
+                value = new_value
+
+        # Range check
+        if value > 255 or value < 0:
+            err = "Value {} exceeds the size of the board's byte.".format(value)
+            raise OverflowError(err)
+
+        return struct.pack("B",value)
+
     def _send_int(self,value):
         """
         Convert a numerical value into an integer, then to a bytes object Check
@@ -477,6 +502,13 @@ class CmdMessenger:
         """
 
         return struct.unpack("c",value)[0].decode("ascii")
+
+    def _recv_byte(self,value):
+        """
+        Recieve a byte in binary format, returning as python int.
+        """
+
+        return struct.unpack("B",value)[0]
 
     def _recv_int(self,value):
         """
