@@ -149,7 +149,7 @@ class ArduinoBoard:
 
         if not self._is_connected:
             
-            print("Connecting to arduino on {}... ".format(self.device),end="")
+            print ("Connecting to arduino on {}... ".format(self.device))
 
             self.comm = serial.Serial()
             self.comm.port = self.device
