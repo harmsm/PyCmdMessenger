@@ -227,6 +227,21 @@ dthe default escape character is `/`.  If the user sends the string
 escape character when received.  The same behavior should hold for recieving
 from the arduino.  
 
+###Special formats
+ * `"*"` tells the CmdMessenger class to repeat the previous format for all 
+   remaining arguments, however many there are. This is useful if your arduino
+   function sends back an undetermined number of arguments of the same type, 
+   , for example.  There are a few rules for use:
+
+   + Only one `*` may be specified per format string.
+   + The one `*` must occur *last*
+   + It must be preceded by a different format that will then be repeated.
+
+   Examples:
+   + `"i*"` will use an integer format until it runs out of fields.
+   + `"fs?*"` will read the first two fields as a `float` and `string`, then any 
+     remaining fields as `bool`.
+
 ##Testing
 
 The [test](https://github.com/harmsm/PyCmdMessenger/tree/master/test) directory
