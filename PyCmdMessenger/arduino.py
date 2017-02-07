@@ -46,6 +46,8 @@ class ArduinoBoard:
             https://www.arduino.cc/en/Reference/HomePage (under data types)
 
         The default parameters work for ATMega328p boards.
+        Note that binary strings are passed as little-endian (which should
+        work for all arduinos)
         """
 
         self.device = device
@@ -108,9 +110,9 @@ class ArduinoBoard:
         # properly format the bytes strings.
         #----------------------------------------------------------------------
 
-        INTEGER_TYPE = {2:"h",4:"i",8:"l"}
-        UNSIGNED_INTEGER_TYPE = {2:"H",4:"I",8:"L"}
-        FLOAT_TYPE = {4:"f",8:"d"}
+        INTEGER_TYPE = {2:"<h",4:"<i",8:"<l"}
+        UNSIGNED_INTEGER_TYPE = {2:"<H",4:"<I",8:"<L"}
+        FLOAT_TYPE = {4:"<f",8:"<d"}
 
         try:
             self.int_type = INTEGER_TYPE[self.int_bytes]

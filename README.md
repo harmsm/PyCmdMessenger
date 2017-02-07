@@ -231,7 +231,7 @@ from the arduino.
  * `"*"` tells the CmdMessenger class to repeat the previous format for all 
    remaining arguments, however many there are. This is useful if your arduino
    function sends back an undetermined number of arguments of the same type, 
-   , for example.  There are a few rules for use:
+   for example.  There are a few rules for use:
 
    + Only one `*` may be specified per format string.
    + The one `*` must occur *last*
@@ -239,8 +239,8 @@ from the arduino.
 
    Examples:
    + `"i*"` will use an integer format until it runs out of fields.
-   + `"fs?*"` will read the first two fields as a `float` and `string`, then any 
-     remaining fields as `bool`.
+   + `"fs?*"` will read/send the first two fields as a `float` and `string`,
+     then any remaining fields as `bool`.
 
 ##Testing
 
@@ -297,6 +297,13 @@ c.sendCmdArg(string2);
 // ...
 c.sendCmdEnd();
 ```
+
+##Release Notes
+
+###0.2.4:
+ + Added `byte` data type
+ + Binary strings passed back and forth are now explicitly little-endian
+ + Added `*` multiple format flag
 
 ##Python Classes
 
@@ -447,3 +454,5 @@ CmdMessenger
 
     give_warnings
 ```
+
+
