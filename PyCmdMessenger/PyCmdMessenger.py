@@ -117,7 +117,7 @@ class CmdMessenger:
                               "?":self._recv_bool,
                               "g":self._recv_guess}
 
-    def send(self,cmd,*args,arg_formats=None):
+    def send(self,cmd,*args):
         """
         Send a command (which may or may not have associated arguments) to an 
         arduino using the CmdMessage protocol.  The command and any parameters
@@ -172,7 +172,7 @@ class CmdMessenger:
         # Send the message.
         self.board.write(compiled_bytes)
 
-    def receive(self,arg_formats=None):
+    def receive(self):
         """
         Recieve commands coming off the serial port. 
 
@@ -638,5 +638,4 @@ class CmdMessenger:
 
         # Return as string
         return self._recv_string(value)
-
 
