@@ -10,6 +10,8 @@ __usage__ = "run_test.py serial_device [s] (optional s will test string interfac
 import PyCmdMessenger
 import time, string, sys, struct, random
 
+from __future__ import print_function
+
 BAUD_RATE = 115200
 
 COMMANDS = [["kCommError",""],
@@ -249,7 +251,7 @@ class PingPong:
 
             command: command in COMMAND_NAMES to test
 
-            delay: time between send and recieve (seconds)
+            delay: time between send and receive (seconds)
         """
     
         self.type_name = type_name

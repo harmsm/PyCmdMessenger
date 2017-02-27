@@ -2,7 +2,7 @@
 
 Python class for communication with an arduino using the
 [CmdMessenger](https://github.com/thijse/Arduino-CmdMessenger) serial
-communication library. It sends and recieves messages, automatically converting
+communication library. It sends and receives messages, automatically converting
 python data types to arduino types and vice versa.  
 
 This project is not affiliated with the CmdMessenger project, though it
@@ -12,7 +12,7 @@ obviously builds off of their excellent work.
  * From github: 
     + `git clone https://github.com/harmsm/PyCmdMessenger.git` 
     + `cd PyCmdMessenger`
-    + `sudo python3 setup.py install`
+    + `sudo python3 setup.py install` 
  * From PyPI:
     + `sudo pip3 install PyCmdMessenger`
 
@@ -24,7 +24,7 @@ To test the library:
    types between the local computer and the arduino.  
 
 ### Compatibility
- * Compatibility: Python 3.x (a tweaked version supporting Python 2.7 is [here](https://github.com/zlite/PyCmdMessenger)).
+ * Compatibility: Python 2.x and 3.x.
  * Should work on all platforms supported by pyserial.  
  * Known to work on Raspberry Pi (raspbian), linux (Ubuntu 15.10), and Windows 10. 
 
@@ -224,7 +224,7 @@ sending and receiving.  For example, the default field separator is `,` an
 dthe default escape character is `/`.  If the user sends the string 
 `Hello, my name is Bob.`, PyCmdMessenger will convert this to 
 `Hello/, my name is Bob.`  CmdMessenger on the arduino will strip out the 
-escape character when received.  The same behavior should hold for recieving
+escape character when received.  The same behavior should hold for receiving
 from the arduino.  
 
 ###Special formats

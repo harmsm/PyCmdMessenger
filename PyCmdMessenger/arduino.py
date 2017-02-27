@@ -7,6 +7,7 @@ __author__ = "Michael J. Harms"
 __date__ = "2016-05-30"
 
 import serial, time
+from __future__ import print_function
 
 class ArduinoBoard:
     """

@@ -10,8 +10,7 @@ communication library.
 __author__ = "Michael J. Harms"
 __date__ = "2016-05-20"
 
-import serial
-import re, warnings, multiprocessing, time, struct
+import re, warnings, time, struct
 
 class CmdMessenger:
     """
@@ -117,15 +116,16 @@ class CmdMessenger:
                               "?":self._recv_bool,
                               "g":self._recv_guess}
 
-    def send(self,cmd,*args,arg_formats=None):
+    def send(self,cmd,*args,**kwargs):
         """
         Send a command (which may or may not have associated arguments) to an 
         arduino using the CmdMessage protocol.  The command and any parameters
         should be passed as direct arguments to send.  
 
-        arg_formats is an optional string that specifies the formats to use for
-        each argument when passed to the arduino. If specified here,
-        arg_formats supercedes formats specified on initialization.  
+        arg_formats can be passed as a keyword argument. arg_formats is an
+        optional string that specifies the formats to use for each argument
+        when passed to the arduino. If specified here, arg_formats supercedes
+        formats specified on initialization.  
         """
 
         # Turn the command into an integer.
@@ -134,6 +134,11 @@ class CmdMessenger:
         except KeyError:
             err = "Command '{}' not recognized.\n".format(cmd)
             raise ValueError(err)
+
+        # Grab arg_formats from kwargs
+        arg_formats = kwargs.pop('arg_formats', None)
+        if kwargs:
+            raise TypeError("'send()' got unexpected keyword arguments: {}".format(', '.join(kwargs.keys())))
 
         # Figure out what formats to use for each argument.  
         arg_format_list = []
@@ -276,7 +281,7 @@ class CmdMessenger:
 
         if len(fields[1:]) > 0:
             if len(arg_format_list) != len(fields[1:]):
-                err = "Number of argument formats must match the number of recieved arguments."
+                err = "Number of argument formats must match the number of received arguments."
                 raise ValueError(err)
 
         received = []

@@ -14,6 +14,8 @@ __usage__ = "./rapid-float.py serial_device (like /dev/ttyACM0)"
 import random, sys
 import PyCmdMessenger
 
+from __future__ import print_function
+
 def main(argv=None):
     
     if argv == None:
