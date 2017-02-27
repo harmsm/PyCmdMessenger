@@ -24,7 +24,7 @@ To test the library:
    types between the local computer and the arduino.  
 
 ### Compatibility
- * Compatibility: Python 2.x and 3.x.
+ * Compatibility: Python 2 and 3.
  * Should work on all platforms supported by pyserial.  
  * Known to work on Raspberry Pi (raspbian), linux (Ubuntu 15.10), and Windows 10. 
 

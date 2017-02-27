@@ -8,12 +8,12 @@ from setuptools import setup, find_packages
 # Need to add all dependencies to setup as we go!
 setup(name='PyCmdMessenger',
       packages=['PyCmdMessenger'],
-      version='0.2.4',
+      version='0.2.5',
       description='Python interface for CmdMessenger arduino serial communication library',
       author='Michael J. Harms',
       author_email='harmsm@gmail.com',
       url='https://github.com/harmsm/PyCmdMessenger',
-      download_url='https://github.com/harmsm/PyCmdMessenger/tarball/0.2.4',
+      download_url='https://github.com/harmsm/PyCmdMessenger/tarball/0.2.5',
       zip_safe=False,
       install_requires=["pyserial"],
       classifiers=['Programming Language :: Python'])
