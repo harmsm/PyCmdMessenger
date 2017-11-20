@@ -1,4 +1,4 @@
-#PyCmdMessenger
+# PyCmdMessenger
 
 Python class for communication with an arduino using the
 [CmdMessenger](https://github.com/thijse/Arduino-CmdMessenger) serial
@@ -40,7 +40,7 @@ in the [test/arduino](https://github.com/harmsm/PyCmdMessenger/tree/master/test/
 [examples/arduino](https://github.com/harmsm/PyCmdMessenger/tree/master/examples/arduino)
 directories. 
 
-##Example code
+## Example code
 
 A typical CmdMessenger message has the following structure:
 
@@ -69,7 +69,7 @@ To ensure stable communication with PyCmdMessenger:
 A basic example is shown below.  These files are in the 
 [examples](https://github.com/harmsm/PyCmdMessenger/tree/master/examples) directory.
  
-###Arduino
+### Arduino
 
 ```C
 
@@ -175,7 +175,7 @@ msg = c.receive()
 print(msg)
 ```
 
-##Format arguments
+## Format arguments
 
 The format for each argument sent with a command (or received with a command)
 is determined by the command_formats list passed to the CmdMessenger class (see
@@ -188,7 +188,7 @@ format string would be `"fffff"`.  The types can be mixed and matched at will.
 a string, integer, bool, bool, and float.  If no argument is associated with a
 command, an empty string (`""`) or `None` can be used for the format.
 
-###Format reference table
+### Format reference table
 
 | format | arduino type  | Python Type              | Arduino receive                                       | Arduino send                        |
 |--------|---------------|--------------------------|-------------------------------------------------------|-------------------------------------|
@@ -227,7 +227,7 @@ dthe default escape character is `/`.  If the user sends the string
 escape character when received.  The same behavior should hold for recieving
 from the arduino.  
 
-###Special formats
+### Special formats
  * `"*"` tells the CmdMessenger class to repeat the previous format for all 
    remaining arguments, however many there are. This is useful if your arduino
    function sends back an undetermined number of arguments of the same type, 
@@ -242,7 +242,7 @@ from the arduino.
    + `"fs?*"` will read/send the first two fields as a `float` and `string`,
      then any remaining fields as `bool`.
 
-##Testing
+## Testing
 
 The [test](https://github.com/harmsm/PyCmdMessenger/tree/master/test) directory
 has an arduino sketch (in `pingpong_arduino`) that can be compiled and loaded
@@ -250,14 +250,14 @@ onto an arudino, as well as a python test script, `pingpong_test.py`.  This will
 send a wide range of values for every data type back and forth to the arduino,
 reporting success and failure.  
 
-##Known Issues
+## Known Issues
 
  + Opening the serial connection from a linux machine will cause the arduino to reset.  This is a [known issue](https://github.com/pyserial/pyserial/issues/124) with pyserial and the arudino architecture.  This behavior can be prevented on a windows host using by setting `arduino.ArduinoBoard(enable_dtr=False)` (the default). See [issue #9](https://github.com/harmsm/PyCmdMessenger/issues/9) for discussion.  
 
-##Quick reference for CmdMessenger on arduino side
+## Quick reference for CmdMessenger on arduino side
 For more details, see the [CmdMessenger](https://github.com/thijse/Arduino-CmdMessenger) project page.
 
-###Receiving
+### Receiving
 ```C
 /* c is an instance of CmdMessenger (see example sketch above) */
 /* ------- For all types except strings (replace TYPE appropriately) --------*/
@@ -267,7 +267,7 @@ int value = c.readBinArg<TYPE>();
 char string[BUFFER_SIZE] = c.readStringArg();
 
 ```
-###Sending
+### Sending
 ```C
 /* COMMAND_NAME must be enumerated at the top of the sketch.  c is an instance
  * of CmdMessenger (see example sketch above) */
@@ -298,14 +298,14 @@ c.sendCmdArg(string2);
 c.sendCmdEnd();
 ```
 
-##Release Notes
+## Release Notes
 
-###0.2.4:
+### 0.2.4:
  + Added `byte` data type
  + Binary strings passed back and forth are now explicitly little-endian
  + Added `*` multiple format flag
 
-##Python Classes
+## Python Classes
 
 ```
 ArduinoBoard 
