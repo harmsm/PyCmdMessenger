@@ -10,8 +10,7 @@ communication library.
 __author__ = "Michael J. Harms"
 __date__ = "2016-05-20"
 
-import serial
-import re, warnings, multiprocessing, time, struct
+import re, warnings, time, struct
 
 class CmdMessenger:
     """
