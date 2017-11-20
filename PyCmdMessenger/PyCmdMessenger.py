@@ -102,6 +102,7 @@ class CmdMessenger:
                               "f":self._send_float,
                               "d":self._send_double,
                               "s":self._send_string,
+                              "B":self._send_bytes,
                               "?":self._send_bool,
                               "g":self._send_guess}
 
@@ -114,6 +115,7 @@ class CmdMessenger:
                               "f":self._recv_float,
                               "d":self._recv_double,
                               "s":self._recv_string,
+                              "B":self._recv_bytes,
                               "?":self._recv_bool,
                               "g":self._recv_guess}
 
@@ -497,6 +499,16 @@ class CmdMessenger:
 
         return value
 
+    def _send_bytes(self,value):
+        """
+        Convert value to a bytes object using the standard constructor.
+        """
+
+        if type(value) != bytes:
+            value = bytes(value)
+
+        return value
+
     def _send_bool(self,value):
         """
         Convert a boolean value into a bytes object.  Uses 0 and 1 as output.
@@ -599,6 +611,13 @@ class CmdMessenger:
         s = s.strip()
 
         return s
+
+    def _recv_bytes(self,value):
+        """
+        Recieve a binary (bytes) string, return it unchanged.
+        """
+
+        return value
 
     def _recv_bool(self,value):
         """
