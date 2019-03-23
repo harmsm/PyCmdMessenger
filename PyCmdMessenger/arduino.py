@@ -184,7 +184,10 @@ class ArduinoBoard:
         Wrap serial write method.
         """
         
-        self.comm.write(msg)
+        msg_len = len(msg)
+        bytes_written = 0
+        while bytes_written < msg_len:
+            bytes_written += self.comm.write(msg[bytes_written:])
 
     def close(self):
         """
